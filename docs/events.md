@@ -1,0 +1,70 @@
+# Event System
+
+OumLib features a modern, fluent event bus wrapper. It provides cleaner listener registration, custom conditional filtering, execution boundaries, and platform-level lifecycle management.
+
+---
+
+## 1. Registration & Custom Filtering
+
+Use `.filter(...)` to add condition checks to your event listener. The callback handler will only execute if all filter checks return `true`.
+
+```java
+import dev.oum.oumlib.event.Events;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.EquipmentSlot;
+
+Events.listen(PlayerInteractEvent.class)
+    // Filter out off-hand clicks
+    .filter(event -> event.getHand() == EquipmentSlot.HAND)
+    // Filter to only trigger if the player is holding a diamond sword
+    .filter(event -> event.getPlayer().getInventory().getItemInMainHand().getType().name().contains("DIAMOND_SWORD"))
+    .handler(event -> {
+        event.getPlayer().sendMessage("You swung a diamond sword!");
+    });
+```
+
+---
+
+## 2. Cancellable Events & State Handling
+
+You can configure how the event listener behaves regarding cancelled events:
+- **`ignoreCancelled()`**: The listener will skip execution if another plugin has already cancelled the event.
+- **`onlyIfCancelled()`**: The listener will *only* fire if the event has already been cancelled by another plugin.
+
+```java
+import org.bukkit.event.block.BlockBreakEvent;
+
+Events.listen(BlockBreakEvent.class)
+    .ignoreCancelled() // Skip if block break is protected/cancelled
+    .handler(event -> {
+        System.out.println("A block was successfully broken by " + event.getPlayer().getName());
+    });
+```
+
+---
+
+## 3. Automatic Unregistration & Memory Protection
+
+To avoid memory leaks, you can configure listeners to unregister themselves automatically when certain thresholds are reached:
+- **`maxFires(int count)`**: Automatically cleans up and unregisters the listener after it executes a set number of times.
+- **`expireAfter(Duration duration)`**: Automatically unregisters the listener after a set period of time has elapsed since registration.
+
+```java
+import org.bukkit.event.player.PlayerQuitEvent;
+import java.time.Duration;
+
+Events.listen(PlayerQuitEvent.class)
+    .maxFires(1) // Runs once, then cleans up. Perfect for single-event wait loops.
+    .expireAfter(Duration.ofMinutes(10)) // Automatically unregisters after 10 minutes
+    .handler(event -> {
+        System.out.println("This message will print for at most one quit event within the next 10 minutes.");
+    });
+```
+
+---
+
+## 4. Thread Safety & Folia Compatibility
+
+- **Paper/Spigot**: Event handlers run synchronously on the server's main tick thread (the standard Bukkit behavior), unless the event itself is marked as asynchronous (e.g. `AsyncChatEvent`).
+- **Velocity**: Event handlers are run asynchronously on Netty thread pools. Velocity events do not run on a single main thread.
+- **Folia**: Folia runs events on the thread executing the region tick where the event occurred. Since region tick threads change dynamically, ensure any external data mutations triggered inside your handlers are thread-safe (e.g. using `ConcurrentHashMap` or thread-safe atomic variables).

@@ -1,0 +1,131 @@
+package dev.oum.oumlib.command.platform;
+
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
+import com.velocitypowered.api.command.BrigadierCommand;
+import com.velocitypowered.api.command.CommandManager;
+import com.velocitypowered.api.command.CommandMeta;
+import com.velocitypowered.api.command.CommandSource;
+import com.velocitypowered.api.proxy.Player;
+import dev.oum.oumlib.OumLib;
+import dev.oum.oumlib.command.Argument;
+import dev.oum.oumlib.command.ArgumentMap;
+import dev.oum.oumlib.command.CommandBuilder;
+import dev.oum.oumlib.command.CommandContext;
+import dev.oum.oumlib.command.CommandRegistrar;
+import dev.oum.oumlib.command.SubcommandBuilder;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.jspecify.annotations.NonNull;
+
+import java.util.List;
+import java.util.function.Consumer;
+
+public final class VelocityCommandRegistrar implements CommandRegistrar {
+
+    @Override
+    public void register(@NonNull CommandBuilder builder) {
+        CommandManager commandManager = OumLib.proxy().getCommandManager();
+        CommandMeta meta = commandManager.metaBuilder(builder.label())
+                .aliases(builder.aliases().toArray(new String[0]))
+                .build();
+
+        BrigadierCommand command = new BrigadierCommand(buildNode(builder).build());
+        commandManager.register(meta, command);
+    }
+
+    private @NonNull LiteralArgumentBuilder<CommandSource> buildNode(@NonNull CommandBuilder builder) {
+        var root = LiteralArgumentBuilder.<CommandSource>literal(builder.label());
+
+        if (builder.permission() != null) {
+            String perm = builder.permission();
+            root.requires(source -> source.hasPermission(perm));
+        }
+
+        for (SubcommandBuilder sub : builder.subcommands()) {
+            var subLiteral = LiteralArgumentBuilder.<CommandSource>literal(sub.label());
+            if (sub.permission() != null) {
+                String subPerm = sub.permission();
+                subLiteral.requires(source -> source.hasPermission(subPerm));
+            }
+            attachArguments(subLiteral, sub.arguments(), sub.executor(), builder);
+            root.then(subLiteral);
+        }
+
+        if (builder.executor() != null) {
+            attachArguments(root, builder.arguments(), builder.executor(), builder);
+        }
+
+        return root;
+    }
+
+    private void attachArguments(
+            LiteralArgumentBuilder<CommandSource> node,
+            @NonNull List<Argument<?>> args,
+            Consumer<CommandContext> exec,
+            CommandBuilder builder
+    ) {
+        if (args.isEmpty()) {
+            node.executes(ctx -> {
+                handleExecution(ctx.getSource(), new ArgumentMap(ctx), exec, builder);
+                return 1;
+            });
+            return;
+        }
+
+        RequiredArgumentBuilder<CommandSource, ?> first = buildArgChain(args, exec, builder);
+        node.then(first);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private RequiredArgumentBuilder<CommandSource, ?> buildArgChain(
+            @NonNull List<Argument<?>> args,
+            Consumer<CommandContext> exec,
+            CommandBuilder builder
+    ) {
+        RequiredArgumentBuilder head = null;
+        RequiredArgumentBuilder prev = null;
+
+        for (int i = 0; i < args.size(); i++) {
+            Argument<?> arg = args.get(i);
+            RequiredArgumentBuilder current = RequiredArgumentBuilder.argument(
+                    arg.name(), arg.brigadierType()
+            );
+            if (arg.suggestionProvider() != null) {
+                current.suggests(arg.suggestionProvider());
+            }
+            if (i == args.size() - 1) {
+                current.executes(ctx -> {
+                    handleExecution((CommandSource) ctx.getSource(), new ArgumentMap(ctx), exec, builder);
+                    return 1;
+                });
+            }
+            if (head == null) {
+                head = current;
+            } else {
+                prev.then(current);
+            }
+            prev = current;
+        }
+
+        return head;
+    }
+
+    private void handleExecution(
+            CommandSource source,
+            ArgumentMap map,
+            Consumer<CommandContext> exec,
+            @NonNull CommandBuilder builder
+    ) {
+        if (builder.cooldownMap() != null && source instanceof Player player) {
+            String bypassPerm = (builder.permission() != null ? builder.permission() : builder.label()) + ".bypass";
+            if (!player.hasPermission(bypassPerm) && builder.cooldownMap().isOnCooldown(player.getUniqueId())) {
+                long remaining = builder.cooldownMap().remainingSeconds(player.getUniqueId());
+                player.sendMessage(MiniMessage.miniMessage()
+                        .deserialize(builder.cooldownMessage().replace("<remaining>", String.valueOf(remaining))));
+                return;
+            }
+            builder.cooldownMap().set(player.getUniqueId());
+        }
+        exec.accept(new CommandContext(source, source, builder.label(), map));
+    }
+}

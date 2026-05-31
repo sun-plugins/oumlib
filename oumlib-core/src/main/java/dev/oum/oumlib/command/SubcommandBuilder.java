@@ -1,0 +1,56 @@
+package dev.oum.oumlib.command;
+
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.Unmodifiable;
+import org.jspecify.annotations.NonNull;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+
+public final class SubcommandBuilder {
+
+    private String label;
+    private String permission;
+    private final List<Argument<?>> arguments = new ArrayList<>();
+    private Consumer<CommandContext> executor;
+
+    public SubcommandBuilder label(String label) {
+        this.label = label;
+        return this;
+    }
+
+    public SubcommandBuilder permission(String permission) {
+        this.permission = permission;
+        return this;
+    }
+
+    public SubcommandBuilder argument(Argument<?> argument) {
+        arguments.add(argument);
+        return this;
+    }
+
+    public SubcommandBuilder executes(Consumer<CommandContext> executor) {
+        this.executor = executor;
+        return this;
+    }
+
+    public String label() {
+        return label;
+    }
+
+    public String permission() {
+        return permission;
+    }
+
+    @Contract(pure = true)
+    @NonNull
+    @Unmodifiable
+    public List<Argument<?>> arguments() {
+        return List.copyOf(arguments);
+    }
+
+    public Consumer<CommandContext> executor() {
+        return executor;
+    }
+}
