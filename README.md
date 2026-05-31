@@ -17,31 +17,15 @@ Add the JitPack repository and the library dependency to your `pom.xml`.
 
 ### 1. Add Repository
 ```xml
-<repositories>
-    <repository>
-        <id>jitpack.io</id>
-        <url>https://jitpack.io</url>
-    </repository>
-</repositories>
+<repository>
+   <id>jitpack.io</id>
+   <url>https://jitpack.io</url>
+</repository>
 ```
 
 ### 2. Add Dependency
 If you are shading the library into your plugin, declare the compile-scope dependency below.
 
-> [!NOTE]
-> Depending on how JitPack resolves your repository setup, the Group ID could use either of the two structures below. If the first one fails to resolve, try the second.
-
-**Option A (Standard mapping):**
-```xml
-<dependency>
-    <groupId>com.github.sun-mc-dev</groupId>
-    <artifactId>oumlib-core</artifactId>
-    <version>1.0.0</version>
-    <scope>compile</scope>
-</dependency>
-```
-
-**Option B (Fallback submodule mapping):**
 ```xml
 <dependency>
     <groupId>com.github.sun-mc-dev.oumlib</groupId>
