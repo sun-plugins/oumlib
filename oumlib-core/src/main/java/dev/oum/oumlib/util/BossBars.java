@@ -11,7 +11,8 @@ import java.time.Duration;
 
 public final class BossBars {
 
-    private BossBars() {}
+    private BossBars() {
+    }
 
     /**
      * Creates and displays a bossbar to an audience.
@@ -24,14 +25,13 @@ public final class BossBars {
         return bar;
     }
 
-    // TODO: add runDelayed in Scheduler.java
-//    /**
-//     * Creates, displays, and automatically removes a bossbar after a specified duration.
-//     */
-//    public static void showTemporary(@NonNull Audience audience, @NonNull String titleMiniMessage,
-//                                     float progress, BossBar.@NonNull Color color, BossBar.@NonNull Overlay overlay,
-//                                     @NonNull Duration duration) {
-//        BossBar bar = show(audience, titleMiniMessage, progress, color, overlay);
-//        Scheduler.runDelayed(duration, () -> audience.hideBossBar(bar));
-//    }
+    /**
+     * Creates, displays, and automatically removes a bossbar after a specified duration.
+     */
+    public static void showTemporary(@NonNull Audience audience, @NonNull String titleMiniMessage,
+                                     float progress, BossBar.@NonNull Color color, BossBar.@NonNull Overlay overlay,
+                                     @NonNull Duration duration) {
+        BossBar bar = show(audience, titleMiniMessage, progress, color, overlay);
+        Scheduler.runDelayed(duration, () -> audience.hideBossBar(bar));
+    }
 }

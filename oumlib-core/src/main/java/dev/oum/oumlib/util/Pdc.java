@@ -1,5 +1,6 @@
 package dev.oum.oumlib.util;
 
+import com.google.gson.Gson;
 import dev.oum.oumlib.OumLib;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
@@ -8,9 +9,15 @@ import org.bukkit.persistence.PersistentDataType;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Arrays;
+import java.util.List;
+
 public final class Pdc {
 
-    private Pdc() {}
+    private static final Gson GSON = new Gson();
+
+    private Pdc() {
+    }
 
     /**
      * Retrieves a string value from the item's PersistentDataContainer.
@@ -43,5 +50,42 @@ public final class Pdc {
         if (meta == null) return null;
         NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
         return meta.getPersistentDataContainer().get(nsk, PersistentDataType.DOUBLE);
+    }
+
+    /**
+     * Retrieves a boolean value from the item's PersistentDataContainer.
+     */
+    public static @Nullable Boolean getBoolean(@NonNull ItemStack item, @NonNull String key) {
+        if (!item.hasItemMeta()) return null;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) return null;
+        NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
+        Byte b = meta.getPersistentDataContainer().get(nsk, PersistentDataType.BYTE);
+        return b != null ? b != 0 : null;
+    }
+
+    /**
+     * Retrieves a long value from the item's PersistentDataContainer.
+     */
+    public static @Nullable Long getLong(@NonNull ItemStack item, @NonNull String key) {
+        if (!item.hasItemMeta()) return null;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) return null;
+        NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
+        return meta.getPersistentDataContainer().get(nsk, PersistentDataType.LONG);
+    }
+
+    /**
+     * Retrieves a string list value from the item's PersistentDataContainer.
+     */
+    public static @Nullable List<String> getList(@NonNull ItemStack item, @NonNull String key) {
+        if (!item.hasItemMeta()) return null;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) return null;
+        NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
+        String raw = meta.getPersistentDataContainer().get(nsk, PersistentDataType.STRING);
+        if (raw == null) return null;
+        if (raw.isEmpty()) return List.of();
+        return Arrays.asList(GSON.fromJson(raw, String[].class));
     }
 }

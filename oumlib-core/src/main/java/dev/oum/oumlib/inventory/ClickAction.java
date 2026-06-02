@@ -5,6 +5,17 @@ import org.jspecify.annotations.NonNull;
 
 public sealed interface ClickAction {
 
+    static @NonNull ClickAction from(@NonNull ClickType type) {
+        return switch (type) {
+            case LEFT -> new LeftClick();
+            case RIGHT -> new RightClick();
+            case SHIFT_LEFT -> new ShiftLeftClick();
+            case SHIFT_RIGHT -> new ShiftRightClick();
+            case MIDDLE -> new MiddleClick();
+            default -> new Other(type);
+        };
+    }
+
     record LeftClick() implements ClickAction {
     }
 
@@ -21,16 +32,5 @@ public sealed interface ClickAction {
     }
 
     record Other(ClickType type) implements ClickAction {
-    }
-
-    static @NonNull ClickAction from(@NonNull ClickType type) {
-        return switch (type) {
-            case LEFT -> new LeftClick();
-            case RIGHT -> new RightClick();
-            case SHIFT_LEFT -> new ShiftLeftClick();
-            case SHIFT_RIGHT -> new ShiftRightClick();
-            case MIDDLE -> new MiddleClick();
-            default -> new Other(type);
-        };
     }
 }

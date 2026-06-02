@@ -3,12 +3,7 @@ package dev.oum.oumlib.command.platform;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import dev.oum.oumlib.OumLib;
-import dev.oum.oumlib.command.Argument;
-import dev.oum.oumlib.command.ArgumentMap;
-import dev.oum.oumlib.command.CommandBuilder;
-import dev.oum.oumlib.command.CommandContext;
-import dev.oum.oumlib.command.CommandRegistrar;
-import dev.oum.oumlib.command.SubcommandBuilder;
+import dev.oum.oumlib.command.*;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
@@ -113,15 +108,15 @@ public final class PaperCommandRegistrar implements CommandRegistrar {
             @NonNull CommandBuilder builder
     ) {
         var sender = source.getSender();
-        if (builder.cooldownMap() != null && sender instanceof Player player) {
+        if (builder.cooldown() != null && sender instanceof Player player) {
             String bypassPerm = (builder.permission() != null ? builder.permission() : builder.label()) + ".bypass";
-            if (!player.hasPermission(bypassPerm) && builder.cooldownMap().isOnCooldown(player.getUniqueId())) {
-                long remaining = builder.cooldownMap().remainingSeconds(player.getUniqueId());
+            if (!player.hasPermission(bypassPerm) && builder.cooldown().isOnCooldown(player.getUniqueId())) {
+                long remaining = builder.cooldown().remainingSeconds(player.getUniqueId());
                 player.sendMessage(MiniMessage.miniMessage()
                         .deserialize(builder.cooldownMessage().replace("<remaining>", String.valueOf(remaining))));
                 return;
             }
-            builder.cooldownMap().set(player.getUniqueId());
+            builder.cooldown().set(player.getUniqueId());
         }
         exec.accept(new CommandContext(source, sender, builder.label(), map));
     }

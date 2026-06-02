@@ -15,12 +15,16 @@ Use the chainable `.pdc(...)` methods on `ItemBuilder`:
 import dev.oum.oumlib.inventory.ItemBuilder;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
+import java.util.List;
 
 ItemStack sword = ItemBuilder.of(Material.DIAMOND_SWORD)
     .name("<gold>Fire Sword</gold>")
     .pdc("item-id", "fire_sword") // String key/value
     .pdc("custom-damage", 15)     // Integer key/value
     .pdc("multiplier", 1.5)       // Double key/value
+    .pdc("unlocked", true)        // Boolean key/value
+    .pdc("created-at", 1717300000L) // Long key/value
+    .pdc("tags", List.of("legendary", "fire")) // List<String> key/value
     .build();
 ```
 
@@ -30,6 +34,7 @@ Use the static methods in `Pdc` to fetch the metadata back from any `ItemStack`:
 ```java
 import dev.oum.oumlib.util.Pdc;
 import org.bukkit.inventory.ItemStack;
+import java.util.List;
 
 ItemStack clickedItem = player.getInventory().getItemInMainHand();
 
@@ -37,6 +42,9 @@ ItemStack clickedItem = player.getInventory().getItemInMainHand();
 String itemId = Pdc.get(clickedItem, "item-id");
 Integer customDamage = Pdc.getInt(clickedItem, "custom-damage");
 Double multiplier = Pdc.getDouble(clickedItem, "multiplier");
+Boolean unlocked = Pdc.getBoolean(clickedItem, "unlocked");
+Long createdAt = Pdc.getLong(clickedItem, "created-at");
+List<String> tags = Pdc.getList(clickedItem, "tags");
 ```
 
 ---
@@ -85,7 +93,11 @@ String serialized = Locations.serialize(loc);
 String blockSerialized = Locations.serializeBlock(loc); 
 // Output example: "world,120,64,-251"
 
-// 3. Deserialization
+// 3. Folia-compatible Region serialization (world,x,y,z,yaw,pitch,chunkX,chunkZ)
+String regionSerialized = Locations.serializeRegion(loc);
+// Output example: "world,120.5,64.0,-250.3,90.0,0.0,7,-16"
+
+// 4. Deserialization (handles both standard and region serialization formats)
 Location parsedLoc = Locations.deserialize(serialized);
 ```
 
@@ -143,4 +155,66 @@ Player player = ...;
 
 // Transfer the player to a server named "lobby"
 boolean success = Proxy.connect(player, "lobby");
+```
+
+---
+
+## 7. Standalone Cooldowns
+
+A standalone cooldown system mapping `UUID`s to durations, completely independent of command contexts.
+
+```java
+import dev.oum.oumlib.util.Cooldown;
+import java.time.Duration;
+
+// Create a cooldown that lasts for 5 seconds
+Cooldown speedCooldown = Cooldown.of(Duration.ofSeconds(5));
+
+if (speedCooldown.isOnCooldown(player.getUniqueId())) {
+    player.sendMessage("Remaining time: " + speedCooldown.remainingSeconds(player.getUniqueId()) + "s");
+} else {
+    // Activate speed boost...
+    speedCooldown.set(player.getUniqueId());
+}
+```
+
+---
+
+## 8. PlayerData Persistence (Paper-only)
+
+A simple helper wrapper for player PersistentDataContainers, making read/write operations for player-bound data easy and clean.
+
+```java
+import dev.oum.oumlib.util.PlayerData;
+
+PlayerData data = PlayerData.of(player);
+
+// Set player-bound persistent values
+data.set("rank", "MVP");
+data.setInt("coins", 500);
+data.setBoolean("claimed-reward", true);
+
+// Get values
+String rank = data.getOrDefault("rank", "Default");
+int coins = data.getIntOrDefault("coins", 0);
+boolean claimed = data.getBooleanOrDefault("claimed-reward", false);
+```
+
+---
+
+## 9. Permission Builder
+
+A cross-platform permission checker and builder that automatically registers permissions on Paper/Bukkit with default permission states.
+
+```java
+import dev.oum.oumlib.util.Permission;
+
+Permission adminPerm = Permission.builder("myplugin.admin")
+    .description("Allows admin commands access.")
+    .defaultValue(Permission.Default.OP) // Auto-registers with OP default on Paper
+    .build();
+
+if (adminPerm.has(sender)) {
+    // Perform admin actions...
+}
 ```

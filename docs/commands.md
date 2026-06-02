@@ -48,8 +48,10 @@ public class MyCommands {
 The `CommandContext` object represents the execution environment:
 
 - `context.sender()`: Returns the Kyori `Audience` representing the command executor. On Paper, this can be cast directly to a Bukkit `Player` or `ConsoleCommandSender`.
-- `context.source()`: The underlying platform execution source. On Paper, this is Brigadier's `CommandSourceStack`. On Velocity, it is a `CommandSource`.
+- `context.playerOrThrow()`: Returns the player object cast to the appropriate platform type, throwing an `IllegalStateException` if the sender is not a player.
 - `context.isPlayer()`: Utility check returning `true` if the sender is a player.
+- `context.isConsole()`: Utility check returning `true` if the sender is the console.
+- `context.source()`: The underlying platform execution source. On Paper, this is Brigadier's `CommandSourceStack`. On Velocity, it is a `CommandSource`.
 - `context.args()`: Accessor for parsed command arguments.
 
 ---

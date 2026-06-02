@@ -8,7 +8,8 @@ import org.jspecify.annotations.Nullable;
 
 public final class Locations {
 
-    private Locations() {}
+    private Locations() {
+    }
 
     /**
      * Serializes a Location to a standard comma-separated String.
@@ -16,11 +17,11 @@ public final class Locations {
      */
     public static @NonNull String serialize(@NonNull Location loc) {
         return (loc.getWorld() != null ? loc.getWorld().getName() : "world") + "," +
-               loc.getX() + "," +
-               loc.getY() + "," +
-               loc.getZ() + "," +
-               loc.getYaw() + "," +
-               loc.getPitch();
+                loc.getX() + "," +
+                loc.getY() + "," +
+                loc.getZ() + "," +
+                loc.getYaw() + "," +
+                loc.getPitch();
     }
 
     /**
@@ -29,9 +30,9 @@ public final class Locations {
      */
     public static @NonNull String serializeBlock(@NonNull Location loc) {
         return (loc.getWorld() != null ? loc.getWorld().getName() : "world") + "," +
-               loc.getBlockX() + "," +
-               loc.getBlockY() + "," +
-               loc.getBlockZ();
+                loc.getBlockX() + "," +
+                loc.getBlockY() + "," +
+                loc.getBlockZ();
     }
 
     /**
@@ -40,7 +41,7 @@ public final class Locations {
     public static @Nullable Location deserialize(@NonNull String str) {
         String[] parts = str.split(",");
         if (parts.length < 4) return null;
-        
+
         World world = Bukkit.getWorld(parts[0]);
         if (world == null) return null;
 
@@ -54,5 +55,13 @@ public final class Locations {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    /**
+     * Serializes a Location along with its chunk coordinates for Folia region compatibility.
+     * Format: world,x,y,z,yaw,pitch,chunkX,chunkZ
+     */
+    public static @NonNull String serializeRegion(@NonNull Location loc) {
+        return serialize(loc) + "," + (loc.getBlockX() >> 4) + "," + (loc.getBlockZ() >> 4);
     }
 }

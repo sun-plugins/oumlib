@@ -39,6 +39,18 @@ public final class TaskGroup {
         return handle;
     }
 
+    public @NonNull TaskHandle runAt(Object location, Runnable task) {
+        TaskHandle handle = Scheduler.runAt(location, task);
+        handles.add(handle);
+        return handle;
+    }
+
+    public @NonNull TaskHandle runFor(Object entity, Runnable task) {
+        TaskHandle handle = Scheduler.runFor(entity, task);
+        handles.add(handle);
+        return handle;
+    }
+
     public void cancelAll() {
         handles.forEach(TaskHandle::cancel);
         handles.clear();

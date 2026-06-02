@@ -13,16 +13,6 @@ public final class Placeholders {
     private static final Pattern PLACEHOLDER = Pattern.compile("%(.*?)%");
     private static final Map<String, PlaceholderSupplier> registered = new ConcurrentHashMap<>();
 
-    @FunctionalInterface
-    public interface PlaceholderSupplier {
-        String get(@NonNull Object player);
-    }
-
-    @FunctionalInterface
-    public interface ConfigPlaceholderSupplier<T extends Record & ConfigSection> {
-        String get(@NonNull Object player, T config);
-    }
-
     public static void register(@NonNull String key, @NonNull PlaceholderSupplier supplier) {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(supplier, "supplier");
@@ -84,5 +74,15 @@ public final class Placeholders {
                 .replaceAll("([a-z])([A-Z])", "$1-$2")
                 .replaceAll("([A-Z]+)([A-Z][a-z])", "$1-$2")
                 .toLowerCase();
+    }
+
+    @FunctionalInterface
+    public interface PlaceholderSupplier {
+        String get(@NonNull Object player);
+    }
+
+    @FunctionalInterface
+    public interface ConfigPlaceholderSupplier<T extends Record & ConfigSection> {
+        String get(@NonNull Object player, T config);
     }
 }

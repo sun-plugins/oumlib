@@ -31,40 +31,6 @@ public final class VelocityEventBus implements EventBusAdapter {
         return instance;
     }
 
-    @Override
-    public <E> @NonNull ListenerHandle register(@NonNull EventBuilder<E> builder) {
-        AtomicInteger fireCount = new AtomicInteger();
-        Instant expiry = builder.expireAfter() != null ? Instant.now().plus(builder.expireAfter()) : null;
-
-        EventHandler<E> finalHandler = event -> {
-            if (expiry != null && Instant.now().isAfter(expiry)) {
-                return;
-            }
-
-            if (builder.shouldIgnoreCancelled() && isCancelled(event)) return;
-            if (builder.shouldOnlyIfCancelled() && !isCancelled(event)) return;
-
-            for (var filter : builder.filters()) {
-                if (!filter.test(event)) return;
-            }
-
-            builder.handler().accept(event);
-
-            if (builder.maxFires() > 0) {
-                fireCount.incrementAndGet();
-            }
-        };
-
-        server.getEventManager().register(
-                plugin,
-                builder.type(),
-                toPriority(builder.priority()),
-                finalHandler
-        );
-
-        return new ListenerHandle(() -> server.getEventManager().unregister(plugin, finalHandler));
-    }
-
     private static boolean isCancelled(Object event) {
         if (event instanceof ResultedEvent<?> resulted) {
             Object result = resulted.getResult();
@@ -83,5 +49,50 @@ public final class VelocityEventBus implements EventBusAdapter {
             case HIGH -> (short) (Short.MIN_VALUE / 2);
             case HIGHEST, MONITOR -> (short) (Short.MIN_VALUE + 1);
         };
+    }
+
+    @Override
+    public <E> @NonNull ListenerHandle register(@NonNull EventBuilder<E> builder) {
+        class VelocityHandler implements EventHandler<E> {
+            final AtomicInteger fireCount = new AtomicInteger();
+            final Instant expiry = builder.expireAfter() != null ? Instant.now().plus(builder.expireAfter()) : null;
+            volatile ListenerHandle handle;
+
+            @Override
+            public void execute(E event) {
+                if (handle != null && !handle.isActive()) return;
+
+                if (expiry != null && Instant.now().isAfter(expiry)) {
+                    if (handle != null) handle.unregister();
+                    return;
+                }
+
+                if (builder.shouldIgnoreCancelled() && isCancelled(event)) return;
+                if (builder.shouldOnlyIfCancelled() && !isCancelled(event)) return;
+
+                for (var filter : builder.filters()) {
+                    if (!filter.test(event)) return;
+                }
+
+                builder.handler().accept(event);
+
+                if (builder.maxFires() > 0 && fireCount.incrementAndGet() >= builder.maxFires()) {
+                    if (handle != null) handle.unregister();
+                }
+            }
+        }
+
+        VelocityHandler handler = new VelocityHandler();
+        ListenerHandle handle = new ListenerHandle(() -> server.getEventManager().unregister(plugin, handler));
+        handler.handle = handle;
+
+        server.getEventManager().register(
+                plugin,
+                builder.type(),
+                toPriority(builder.priority()),
+                handler
+        );
+
+        return handle;
     }
 }

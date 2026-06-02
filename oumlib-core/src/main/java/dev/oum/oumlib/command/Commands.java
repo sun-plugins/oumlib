@@ -5,7 +5,8 @@ import org.jspecify.annotations.NonNull;
 
 public final class Commands {
 
-    private Commands() {}
+    private Commands() {
+    }
 
     @Contract("_ -> new")
     public static @NonNull CommandBuilder create(String label) {

@@ -13,19 +13,21 @@ import java.time.Duration;
 
 public final class BukkitSchedulerAdapter implements SchedulerAdapter {
 
-    private static BukkitSchedulerAdapter instance;
-    private final Plugin plugin;
-    private final BukkitScheduler scheduler;
-
     private static final boolean FOLIA;
+    private static BukkitSchedulerAdapter instance;
+
     static {
         boolean folia = false;
         try {
             Class.forName("io.papermc.paper.threadedregions.RegionScheduler");
             folia = true;
-        } catch (ClassNotFoundException ignored) {}
+        } catch (ClassNotFoundException ignored) {
+        }
         FOLIA = folia;
     }
+
+    private final Plugin plugin;
+    private final BukkitScheduler scheduler;
 
     private BukkitSchedulerAdapter(Plugin plugin) {
         this.plugin = plugin;

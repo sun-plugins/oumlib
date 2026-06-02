@@ -9,7 +9,8 @@ import org.jspecify.annotations.Nullable;
 
 public final class Players {
 
-    private Players() {}
+    private Players() {
+    }
 
     /**
      * Gets the exact block the player is looking at within a maximum distance.

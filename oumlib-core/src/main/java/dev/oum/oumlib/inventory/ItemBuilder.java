@@ -1,29 +1,38 @@
 package dev.oum.oumlib.inventory;
 
+import com.destroystokyo.paper.profile.PlayerProfile;
+import com.google.gson.Gson;
 import dev.oum.oumlib.OumLib;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.profile.PlayerTextures;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 
+import java.lang.reflect.Field;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public final class ItemBuilder {
 
     private static final MiniMessage MM = MiniMessage.miniMessage();
-
-    private final ItemStack stack;
+    private static final Gson GSON = new Gson();
     private final ItemMeta meta;
+    private ItemStack stack;
 
     private ItemBuilder(Material material) {
         this.stack = new ItemStack(material);
@@ -79,7 +88,7 @@ public final class ItemBuilder {
     }
 
     public ItemBuilder type(Material material) {
-        stack.setType(material);
+        stack = stack.withType(material);
         return this;
     }
 
@@ -124,6 +133,65 @@ public final class ItemBuilder {
     public ItemBuilder pdc(String key, double value) {
         NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
         meta.getPersistentDataContainer().set(nsk, PersistentDataType.DOUBLE, value);
+        return this;
+    }
+
+    public ItemBuilder pdc(String key, boolean value) {
+        NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
+        meta.getPersistentDataContainer().set(nsk, PersistentDataType.BYTE, (byte) (value ? 1 : 0));
+        return this;
+    }
+
+    public ItemBuilder pdc(String key, long value) {
+        NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
+        meta.getPersistentDataContainer().set(nsk, PersistentDataType.LONG, value);
+        return this;
+    }
+
+    public ItemBuilder pdc(String key, List<String> value) {
+        NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
+        if (value == null) {
+            meta.getPersistentDataContainer().remove(nsk);
+        } else {
+            meta.getPersistentDataContainer().set(nsk, PersistentDataType.STRING, GSON.toJson(value));
+        }
+        return this;
+    }
+
+    public ItemBuilder skull(OfflinePlayer player) {
+        if (meta instanceof SkullMeta skullMeta) {
+            skullMeta.setOwningPlayer(player);
+        }
+        return this;
+    }
+
+    public ItemBuilder skull(String textureValue) {
+        if (meta instanceof SkullMeta skullMeta) {
+            try {
+                PlayerProfile profile = Bukkit.createProfile(UUID.randomUUID(), null);
+                PlayerTextures textures = profile.getTextures();
+                URL url = new URL("http://textures.minecraft.net/texture/" + textureValue);
+                textures.setSkin(url);
+                profile.setTextures(textures);
+                skullMeta.setPlayerProfile(profile);
+            } catch (Throwable t) {
+                try {
+                    Class<?> gameProfileClass = Class.forName("com.mojang.authlib.GameProfile");
+                    Class<?> propertyClass = Class.forName("com.mojang.authlib.properties.Property");
+                    Object profile = gameProfileClass.getConstructor(UUID.class, String.class)
+                            .newInstance(UUID.randomUUID(), null);
+                    Object property = propertyClass.getConstructor(String.class, String.class)
+                            .newInstance("textures", textureValue);
+                    Object properties = gameProfileClass.getMethod("getProperties").invoke(profile);
+                    properties.getClass().getMethod("put", Object.class, Object.class).invoke(properties, "textures", property);
+
+                    Field profileField = skullMeta.getClass().getDeclaredField("profile");
+                    profileField.setAccessible(true);
+                    profileField.set(skullMeta, profile);
+                } catch (Throwable ignored) {
+                }
+            }
+        }
         return this;
     }
 

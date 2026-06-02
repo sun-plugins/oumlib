@@ -10,15 +10,6 @@ import java.util.function.Supplier;
 
 public sealed interface PlaceholderSupplier {
 
-    record PlayerSupplier(Function<Object, String> fn) implements PlaceholderSupplier {
-    }
-
-    record ParamSupplier(BiFunction<Object, Map<String, String>, String> fn) implements PlaceholderSupplier {
-    }
-
-    record GlobalSupplier(Supplier<String> fn) implements PlaceholderSupplier {
-    }
-
     @Contract("_ -> new")
     static @NonNull PlaceholderSupplier ofPlayer(Function<Object, String> fn) {
         return new PlayerSupplier(fn);
@@ -32,5 +23,14 @@ public sealed interface PlaceholderSupplier {
     @Contract("_ -> new")
     static @NonNull PlaceholderSupplier ofGlobal(Supplier<String> fn) {
         return new GlobalSupplier(fn);
+    }
+
+    record PlayerSupplier(Function<Object, String> fn) implements PlaceholderSupplier {
+    }
+
+    record ParamSupplier(BiFunction<Object, Map<String, String>, String> fn) implements PlaceholderSupplier {
+    }
+
+    record GlobalSupplier(Supplier<String> fn) implements PlaceholderSupplier {
     }
 }

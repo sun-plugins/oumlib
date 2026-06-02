@@ -48,10 +48,13 @@ import dev.oum.oumlib.OumLib;
 
 // Register player-specific coins placeholder
 OumLib.placeholders("myplugin")
-    .register("coins", player -> {
-        // Fetch values dynamically
-        int count = Database.getCoins(player.getUniqueId());
-        return String.valueOf(count);
+    .add("coins", player -> {
+        // Since OumLib is cross-platform, player is passed as Object.
+        // Cast it to org.bukkit.entity.Player (Paper) or com.velocitypowered.api.proxy.Player (Velocity)
+        if (player instanceof org.bukkit.entity.Player p) {
+            return String.valueOf(p.getLevel() * 10);
+        }
+        return "0";
     });
 ```
 
@@ -95,6 +98,12 @@ Text.broadcast("<yellow>Winner is <winner>!</yellow>", "winner", playerName);
 
 // 3. Broadcast with a Record data injector
 Text.broadcast("<gold>Stats update: Joins: <joins> | Sent: <sent></gold>", myStatsRecord);
+
+// 4. Broadcast to action bars
+Text.broadcastActionBar("<red>Warning: System overload!</red>");
+
+// 5. Broadcast global titles
+Text.broadcastTitle("<gold>VICTORY!</gold>", "<gray>Blue team won the match</gray>");
 ```
 
 ### Broadcast Presets
@@ -106,5 +115,53 @@ Text.Preset.successBroadcast("A global event has begun!");
 
 // Sends error message with error prefix to all players
 Text.Preset.errorBroadcast("The database connection was lost!");
+```
+
+---
+
+## 6. Localization & Multi-Language (I18n)
+
+OumLib features a built-in localization (I18n) system that automatically loads, parses, and translates keys into localized `Component`s using MiniMessage format. It supports player client locale translation out-of-the-box on both Paper and Velocity.
+
+### Initializing the System
+
+To initialize, specify the default language code (e.g. `en`). OumLib will look inside the `lang/` subfolder in your plugin's data folder (and automatically extract the default lang file if it doesn't exist):
+
+```java
+import dev.oum.oumlib.text.Localization;
+
+// Load translation files (e.g. lang/en.yml, lang/es.yml)
+Localization.load("en");
+```
+
+### Structuring Lang Files
+
+Language files use standard nested YAML, which OumLib flattens to dot-notation paths internally:
+
+```yaml
+# lang/en.yml
+general:
+  welcome: "<green>Welcome back, <player>!</green>"
+  no-permission: "<red>You do not have permission to do this.</red>"
+```
+
+### Translating Messages
+
+You can translate using the default language, or fetch translations dynamically targeting a player's client language:
+
+```java
+import dev.oum.oumlib.text.Localization;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import org.bukkit.entity.Player;
+
+Player player = ...;
+
+// 1. Send localized message matching player's Minecraft client locale settings (e.g. Spanish)
+player.sendMessage(Localization.translateFor(player, "general.welcome", 
+    Placeholder.parsed("player", player.getName())
+));
+
+// 2. Fallback to default server translation
+Component msg = Localization.translate("general.no-permission");
 ```
 

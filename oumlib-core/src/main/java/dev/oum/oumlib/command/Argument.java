@@ -3,6 +3,7 @@ package dev.oum.oumlib.command;
 import com.mojang.brigadier.arguments.ArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
+
 import java.util.function.BiFunction;
 
 public final class Argument<T> {

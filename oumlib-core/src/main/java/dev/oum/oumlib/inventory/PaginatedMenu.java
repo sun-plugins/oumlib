@@ -6,6 +6,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.Contract;
@@ -39,6 +40,11 @@ public final class PaginatedMenu implements Menu {
         this.nextButton = builder.nextButton;
         this.items = List.copyOf(builder.items);
         registerClickListener();
+    }
+
+    @Contract(" -> new")
+    public static @NonNull Builder builder() {
+        return new Builder();
     }
 
     public int totalPages() {
@@ -108,15 +114,20 @@ public final class PaginatedMenu implements Menu {
                 reopen(player);
             }
         });
-    }
 
-    @Contract(" -> new")
-    public static @NonNull Builder builder() {
-        return new Builder();
+        Events.listen(InventoryCloseEvent.class, event -> {
+            if (!(event.getPlayer() instanceof Player player)) return;
+            Inventory inv = open.get(player.getUniqueId());
+            if (inv != null && event.getInventory().equals(inv)) {
+                open.remove(player.getUniqueId());
+                pages.remove(player.getUniqueId());
+            }
+        });
     }
 
     public static final class Builder {
 
+        private final List<ItemStack> items = new ArrayList<>();
         private String title = "<gray>Page <page>/<total>";
         private int rows = 6;
         private int[] contentSlots = {10, 11, 12, 13, 14, 15, 16};
@@ -126,7 +137,6 @@ public final class PaginatedMenu implements Menu {
                 .name("<gray>Previous").build();
         private Function<Integer, ItemStack> nextButton = _ -> ItemBuilder.of(Material.ARROW)
                 .name("<gray>Next").build();
-        private final List<ItemStack> items = new ArrayList<>();
 
         public Builder title(String title) {
             this.title = title;

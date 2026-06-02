@@ -10,9 +10,9 @@ import java.util.function.Consumer;
 
 public final class SubcommandBuilder {
 
+    private final List<Argument<?>> arguments = new ArrayList<>();
     private String label;
     private String permission;
-    private final List<Argument<?>> arguments = new ArrayList<>();
     private Consumer<CommandContext> executor;
 
     public SubcommandBuilder label(String label) {

@@ -6,7 +6,8 @@ import org.jspecify.annotations.NonNull;
 
 public final class Proxy {
 
-    private Proxy() {}
+    private Proxy() {
+    }
 
     /**
      * Safely connects a Velocity player to a server by its registered name.

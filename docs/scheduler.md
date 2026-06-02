@@ -26,15 +26,16 @@ Scheduler.runAsync(() -> {
 
 For operations that must interact with Bukkit/Paper API directly (like spawning entities or modifying blocks), you must run on the server's main thread:
 
-- **`Scheduler.runSync(Runnable)`**: Schedules a task to execute on the next tick of the server's main thread.
-- **`Scheduler.runSyncDelayed(Duration, Runnable)`**: Schedules a task to execute after a specified delay on the server's main thread.
+- **`Scheduler.run(Runnable)`**: Schedules a task to execute on the next tick of the server's main thread.
+- **`Scheduler.runDelayed(Duration, Runnable)`** / **`Scheduler.runLater(Duration, Runnable)`**: Schedules a task to execute after a specified delay on the server's main thread.
 
 ```java
 import dev.oum.oumlib.scheduler.Scheduler;
 import org.bukkit.Bukkit;
 import java.time.Duration;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 
-Scheduler.runSyncDelayed(Duration.ofSeconds(2), () -> {
+Scheduler.runDelayed(Duration.ofSeconds(2), () -> {
     // Bukkit API calls must be run on the sync thread
     Bukkit.broadcast(MiniMessage.miniMessage().deserialize("<green>2 seconds elapsed!</green>"));
 });
@@ -46,7 +47,11 @@ Scheduler.runSyncDelayed(Duration.ofSeconds(2), () -> {
 
 On **Folia**, tasks scheduled asynchronously (`runAsync`) are fully supported and execute on virtual threads.
 - Since Folia uses multi-threaded regional tick loops instead of a single main thread, OumLib executes synchronous tasks (`runSync`) on Folia's global thread pool.
-- For tick-precise regional operations (like block changes at a specific location), you should use Folia's region scheduler API directly, as OumLib's sync tasks are executed globally.
+- For tick-precise regional operations (like block changes at a specific location or modifications to entities), you should use OumLib's region-aware scheduling methods, which transparently fall back to standard synchronous main thread execution on non-Folia platforms:
+  - `Scheduler.runAt(Location, Runnable)`: Schedules a task on the region corresponding to the location.
+  - `Scheduler.runFor(Entity, Runnable)`: Schedules a task on the region corresponding to the entity.
+
+These methods are also supported inside `TaskGroup`s for automatic lifecycle cleanup.
 
 ---
 
@@ -76,3 +81,36 @@ public class Announcer {
 }
 ```
 When your plugin disables, calling `taskGroup.cancelAll()` ensures all repeating loops stop immediately.
+
+---
+
+## 5. Promises and Callback Chaining
+
+OumLib provides a `Promise` wrapper around Java's `CompletableFuture` that simplifies asynchronous operations with callbacks targeted automatically at the correct server tick thread.
+
+This is extremely useful for retrieving data (e.g., database or web queries) asynchronously, and then updating the game state or sending messages on the synchronous main thread safely:
+
+```java
+import dev.oum.oumlib.scheduler.Scheduler;
+import dev.oum.oumlib.scheduler.Promise;
+
+// 1. Fetch values asynchronously
+Scheduler.supplyAsync(() -> database.loadUserCoins(uuid))
+    // 2. Perform callback on the sync main tick thread safely
+    .thenAcceptSync(coins -> {
+        player.sendMessage("Loaded " + coins + " coins from database!");
+    });
+```
+
+### Virtual Threads (Java 21+)
+
+For heavy blocking I/O operations (like HTTP requests, Web APIs, or database queries), you can leverage Java 21 Virtual Threads using the virtual scheduler methods to keep thread overhead at a minimum:
+
+```java
+// 1. Fetch values asynchronously on a JVM Virtual Thread
+Scheduler.supplyVirtual(() -> database.loadUserCoins(uuid))
+    // 2. Perform callback on the sync main tick thread safely
+    .thenAcceptSync(coins -> {
+        player.sendMessage("Loaded " + coins + " coins via Virtual Threads!");
+    });
+```

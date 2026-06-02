@@ -71,6 +71,18 @@ public final class Text {
         OumLib.players().sendMessage(parse(resolved));
     }
 
+    public static void broadcastActionBar(String message, Object... pairs) {
+        OumLib.players().sendActionBar(parse(resolve(message, null, pairs)));
+    }
+
+    public static void broadcastTitle(String title, String subtitle, Duration fadeIn, Duration stay, Duration fadeOut) {
+        OumLib.players().showTitle(Title.title(parse(title), parse(subtitle), Title.Times.times(fadeIn, stay, fadeOut)));
+    }
+
+    public static void broadcastTitle(String title, String subtitle) {
+        broadcastTitle(title, subtitle, Duration.ofMillis(500), Duration.ofMillis(3000), Duration.ofMillis(500));
+    }
+
     @Contract(value = "_ -> new", pure = true)
     public static @NonNull TextBuilder builder(String message) {
         return new TextBuilder(message);
@@ -87,11 +99,11 @@ public final class Text {
         for (int i = 0; i + 1 < pairs.length; i += 2) {
             result = result.replace("<" + pairs[i] + ">", MM.escapeTags(String.valueOf(pairs[i + 1])));
         }
-        return player != null ? PlaceholderResolver.resolveInternal(result, player) : result;
+        return PlaceholderResolver.resolveInternal(result, player);
     }
 
     private static String resolve(String input, Object player) {
-        return player != null ? PlaceholderResolver.resolveInternal(input, player) : input;
+        return PlaceholderResolver.resolveInternal(input, player);
     }
 
     private static String injectRecord(String input, Record data) {

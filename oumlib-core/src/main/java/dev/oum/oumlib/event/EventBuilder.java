@@ -13,13 +13,13 @@ import java.util.function.Predicate;
 public final class EventBuilder<E> {
 
     private final Class<E> type;
+    private final List<Predicate<E>> filters = new ArrayList<>();
     private EventPriority priority = EventPriority.NORMAL;
     private boolean ignoreCancelled;
     private boolean onlyIfCancelled;
     private int maxFires = -1;
     private Duration expireAfter;
     private Consumer<E> handler;
-    private final List<Predicate<E>> filters = new ArrayList<>();
 
     EventBuilder(Class<E> type) {
         this.type = type;

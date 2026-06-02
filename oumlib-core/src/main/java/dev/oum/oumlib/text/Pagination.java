@@ -27,6 +27,11 @@ public final class Pagination<T> {
         this.footer = builder.footer;
     }
 
+    @Contract(value = "_ -> new", pure = true)
+    public static <T> @NonNull Builder<T> builder(List<T> items) {
+        return new Builder<>(items);
+    }
+
     public int totalPages() {
         return Math.max(1, (int) Math.ceil((double) items.size() / pageSize));
     }
@@ -50,11 +55,6 @@ public final class Pagination<T> {
                 .replace("<total>", String.valueOf(totalPages()))
                 .replace("<next>", String.valueOf(Math.min(page + 1, totalPages())))
                 .replace("<prev>", String.valueOf(Math.max(page - 1, 1)));
-    }
-
-    @Contract(value = "_ -> new", pure = true)
-    public static <T> @NonNull Builder<T> builder(List<T> items) {
-        return new Builder<>(items);
     }
 
     public static final class Builder<T> {

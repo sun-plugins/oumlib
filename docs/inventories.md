@@ -123,3 +123,27 @@ ItemStack copied = ItemBuilder.of(item1)
 // .amount(int) - Sets stack quantity
 // .flag(ItemFlag...) - Adds specific item flags
 ```
+
+---
+
+## 5. AnvilMenu Reference
+
+`AnvilMenu` provides a simple way to prompt players for text input using Minecraft's anvil interface.
+
+```java
+import dev.oum.oumlib.inventory.AnvilMenu;
+
+AnvilMenu menu = AnvilMenu.builder()
+    .title("<blue>Rename Item</blue>")
+    .placeholder("Enter new name...")
+    .onConfirm((player, text) -> {
+        player.sendMessage("You entered: " + text);
+    })
+    .onClose(player -> {
+        player.sendMessage("You cancelled the input.");
+    })
+    .build();
+
+// Open the menu for a player
+menu.open(player);
+```

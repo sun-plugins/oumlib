@@ -7,6 +7,7 @@ import org.jspecify.annotations.NonNull;
 import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 public final class Scheduler {
 
@@ -35,6 +36,11 @@ public final class Scheduler {
         return adapter().runLater(delay, task);
     }
 
+    @Contract("_, _ -> new")
+    public static @NonNull TaskHandle runDelayed(Duration delay, Runnable task) {
+        return runLater(delay, task);
+    }
+
     @Contract("_, _, _ -> new")
     public static @NonNull TaskHandle runRepeating(Duration initialDelay, Duration interval, Runnable task) {
         return adapter().runRepeating(initialDelay, interval, task);
@@ -45,8 +51,30 @@ public final class Scheduler {
         return adapter().runAsync(task);
     }
 
+    public static <T> @NonNull Promise<T> supplyAsync(@NonNull Supplier<T> supplier) {
+        return Promise.supplyAsync(supplier);
+    }
+
     public static void runVirtual(Runnable task) {
         Thread.ofVirtual().start(task);
+    }
+
+    public static <T> @NonNull Promise<T> supplyVirtual(@NonNull Supplier<T> supplier) {
+        return Promise.supplyVirtual(supplier);
+    }
+
+    public static @NonNull Promise<Void> runVirtualAsync(@NonNull Runnable task) {
+        return Promise.runVirtual(task);
+    }
+
+    @Contract("_, _ -> new")
+    public static @NonNull TaskHandle runAt(Object location, Runnable task) {
+        return adapter().runAt(location, task);
+    }
+
+    @Contract("_, _ -> new")
+    public static @NonNull TaskHandle runFor(Object entity, Runnable task) {
+        return adapter().runFor(entity, task);
     }
 
     public static @NonNull TaskGroup newGroup() {
