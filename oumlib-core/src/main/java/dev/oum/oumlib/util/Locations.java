@@ -8,39 +8,29 @@ import org.jspecify.annotations.Nullable;
 
 public final class Locations {
 
-    private Locations() {}
+    private Locations() {
+    }
 
-    /**
-     * Serializes a Location to a standard comma-separated String.
-     * Format: world,x,y,z,yaw,pitch
-     */
     public static @NonNull String serialize(@NonNull Location loc) {
         return (loc.getWorld() != null ? loc.getWorld().getName() : "world") + "," +
-               loc.getX() + "," +
-               loc.getY() + "," +
-               loc.getZ() + "," +
-               loc.getYaw() + "," +
-               loc.getPitch();
+                loc.getX() + "," +
+                loc.getY() + "," +
+                loc.getZ() + "," +
+                loc.getYaw() + "," +
+                loc.getPitch();
     }
 
-    /**
-     * Serializes a Location to a block-only format (no yaw/pitch).
-     * Format: world,x,y,z
-     */
     public static @NonNull String serializeBlock(@NonNull Location loc) {
         return (loc.getWorld() != null ? loc.getWorld().getName() : "world") + "," +
-               loc.getBlockX() + "," +
-               loc.getBlockY() + "," +
-               loc.getBlockZ();
+                loc.getBlockX() + "," +
+                loc.getBlockY() + "," +
+                loc.getBlockZ();
     }
 
-    /**
-     * Deserializes a Location from a comma-separated String.
-     */
     public static @Nullable Location deserialize(@NonNull String str) {
         String[] parts = str.split(",");
         if (parts.length < 4) return null;
-        
+
         World world = Bukkit.getWorld(parts[0]);
         if (world == null) return null;
 
@@ -54,5 +44,9 @@ public final class Locations {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    public static @NonNull String serializeRegion(@NonNull Location loc) {
+        return serialize(loc) + "," + (loc.getBlockX() >> 4) + "," + (loc.getBlockZ() >> 4);
     }
 }

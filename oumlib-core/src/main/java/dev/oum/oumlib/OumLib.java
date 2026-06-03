@@ -26,7 +26,7 @@ public final class OumLib {
     private static Plugin plugin;
     private static ProxyServer proxyServer;
     private static Object velocityPlugin;
-    
+
     private static PresetRegistry presetRegistry;
     private static PlaceholderRegistry placeholderRegistry;
     private static boolean initialized;
@@ -40,13 +40,13 @@ public final class OumLib {
         plugin = p;
         presetRegistry = new PresetRegistry();
         placeholderRegistry = new PlaceholderRegistry();
-        
+
         PaperEventBus.initialize(p);
         EventBus.initialize(PaperEventBus.get());
-        
+
         BukkitSchedulerAdapter.initialize(p);
         Scheduler.initialize(BukkitSchedulerAdapter.get());
-        
+
         detectIntegrations(p);
         initialized = true;
         return new InitBuilder();
@@ -59,13 +59,13 @@ public final class OumLib {
         velocityPlugin = pluginInstance;
         presetRegistry = new PresetRegistry();
         placeholderRegistry = new PlaceholderRegistry();
-        
+
         VelocityEventBus.initialize(server, pluginInstance);
         EventBus.initialize(VelocityEventBus.get());
-        
+
         VelocitySchedulerAdapter.initialize(server, pluginInstance);
         Scheduler.initialize(VelocitySchedulerAdapter.get());
-        
+
         detectVelocityIntegrations(server);
         initialized = true;
         return new InitBuilder();
@@ -104,7 +104,8 @@ public final class OumLib {
 
     public static Object velocityPlugin() {
         assertInit();
-        if (velocityPlugin == null) throw new IllegalStateException("Velocity plugin instance is only available on Velocity platform.");
+        if (velocityPlugin == null)
+            throw new IllegalStateException("Velocity plugin instance is only available on Velocity platform.");
         return velocityPlugin;
     }
 

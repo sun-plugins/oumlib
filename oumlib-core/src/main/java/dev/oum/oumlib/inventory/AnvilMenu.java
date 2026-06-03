@@ -36,6 +36,11 @@ public final class AnvilMenu implements Menu {
         registerListeners();
     }
 
+    @Contract(value = " -> new", pure = true)
+    public static @NonNull Builder builder() {
+        return new Builder();
+    }
+
     @Override
     public void open(@NonNull Player player) {
         Inventory inv = player.getServer().createInventory(player, InventoryType.ANVIL, MM.deserialize(title));
@@ -72,11 +77,6 @@ public final class AnvilMenu implements Menu {
                 onClose.accept(player);
             }
         });
-    }
-
-    @Contract(value = " -> new", pure = true)
-    public static @NonNull Builder builder() {
-        return new Builder();
     }
 
     public static final class Builder {

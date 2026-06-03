@@ -15,12 +15,16 @@ Use the chainable `.pdc(...)` methods on `ItemBuilder`:
 import dev.oum.oumlib.inventory.ItemBuilder;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
+import java.util.List;
 
 ItemStack sword = ItemBuilder.of(Material.DIAMOND_SWORD)
     .name("<gold>Fire Sword</gold>")
     .pdc("item-id", "fire_sword") // String key/value
     .pdc("custom-damage", 15)     // Integer key/value
     .pdc("multiplier", 1.5)       // Double key/value
+    .pdc("unlocked", true)        // Boolean key/value
+    .pdc("created-at", 1717300000L) // Long key/value
+    .pdc("tags", List.of("legendary", "fire")) // List<String> key/value
     .build();
 ```
 
@@ -30,6 +34,7 @@ Use the static methods in `Pdc` to fetch the metadata back from any `ItemStack`:
 ```java
 import dev.oum.oumlib.util.Pdc;
 import org.bukkit.inventory.ItemStack;
+import java.util.List;
 
 ItemStack clickedItem = player.getInventory().getItemInMainHand();
 
@@ -37,6 +42,9 @@ ItemStack clickedItem = player.getInventory().getItemInMainHand();
 String itemId = Pdc.get(clickedItem, "item-id");
 Integer customDamage = Pdc.getInt(clickedItem, "custom-damage");
 Double multiplier = Pdc.getDouble(clickedItem, "multiplier");
+Boolean unlocked = Pdc.getBoolean(clickedItem, "unlocked");
+Long createdAt = Pdc.getLong(clickedItem, "created-at");
+List<String> tags = Pdc.getList(clickedItem, "tags");
 ```
 
 ---
@@ -85,7 +93,11 @@ String serialized = Locations.serialize(loc);
 String blockSerialized = Locations.serializeBlock(loc); 
 // Output example: "world,120,64,-251"
 
-// 3. Deserialization
+// 3. Folia-compatible Region serialization (world,x,y,z,yaw,pitch,chunkX,chunkZ)
+String regionSerialized = Locations.serializeRegion(loc);
+// Output example: "world,120.5,64.0,-250.3,90.0,0.0,7,-16"
+
+// 4. Deserialization (handles both standard and region serialization formats)
 Location parsedLoc = Locations.deserialize(serialized);
 ```
 
@@ -113,13 +125,16 @@ Entity entity = Players.getTargetEntity(player, 50);
 
 Kyori's native BossBar API is powerful but requires manual scheduler tracking to clean up. OumLib makes creating self-expiring bossbars easy on both Paper and Velocity:
 
+> [!NOTE]
+> The old utility class `dev.oum.oumlib.util.BossBars` is deprecated since `v1.0.1` and marked for removal in `v1.0.3`. Please use `Text.bossBar` or `Text.bossBarTemporary` instead.
+
 ```java
-import dev.oum.oumlib.util.BossBars;
+import dev.oum.oumlib.text.Text;
 import net.kyori.adventure.bossbar.BossBar;
 import java.time.Duration;
 
 // Show a temporary BossBar that automatically vanishes after 10 seconds
-BossBars.showTemporary(
+Text.bossBarTemporary(
     player, 
     "<red>Danger Zone</red>", 
     1.0f, // progress (0.0 to 1.0)
@@ -131,16 +146,101 @@ BossBars.showTemporary(
 
 ---
 
-## 6. Server Transfer (Velocity-only)
+## 6. Proxy & Routing Utilities (Velocity-only)
 
-Send players between proxy servers using the `Proxy` utility:
+OumLib includes built-in proxy utilities inside the `Proxy` class for handling server transfers, server fallback routing, player counts, and plugin messaging on Velocity.
 
+### Server Connection / Player Transfer
+Transfer players to registered backend servers:
 ```java
 import dev.oum.oumlib.util.Proxy;
 import com.velocitypowered.api.proxy.Player;
 
-Player player = ...;
+Proxy.connect(player, "lobby"); // returns true if connection initiated
+```
 
-// Transfer the player to a server named "lobby"
-boolean success = Proxy.connect(player, "lobby");
+### Auto-Fallback Routing
+When players are kicked or disconnected from a backend server (e.g., during a server crash or restart), automatically redirect them to fallback/lobby servers instead of kicking them from the proxy entirely:
+```java
+import dev.oum.oumlib.util.Proxy;
+import java.util.List;
+
+// Run this during Proxy initialization
+Proxy.registerFallbackRouter(this, List.of("lobby-1", "lobby-2", "hub"));
+```
+
+### Server Player Counts
+Retrieve player counts for a specific server or across a cluster of servers:
+```java
+int lobbyCount = Proxy.getPlayerCount("lobby-1");
+int totalHubPlayers = Proxy.getPlayerCount(List.of("lobby-1", "lobby-2", "hub"));
+```
+
+### Cross-Server Plugin Messaging
+Send plugin message payloads to the player's active backend server connection without writing verbose registration boilerplate:
+```java
+byte[] messagePayload = ...;
+Proxy.sendPluginMessage(player, "myplugin:sync", messagePayload);
+```
+
+---
+
+## 7. Standalone Cooldowns
+
+A standalone cooldown system mapping `UUID`s to durations, completely independent of command contexts.
+
+```java
+import dev.oum.oumlib.util.Cooldown;
+import java.time.Duration;
+
+// Create a cooldown that lasts for 5 seconds
+Cooldown speedCooldown = Cooldown.of(Duration.ofSeconds(5));
+
+if (speedCooldown.isOnCooldown(player.getUniqueId())) {
+    player.sendMessage("Remaining time: " + speedCooldown.remainingSeconds(player.getUniqueId()) + "s");
+} else {
+    // Activate speed boost...
+    speedCooldown.set(player.getUniqueId());
+}
+```
+
+---
+
+## 8. PlayerData Persistence (Paper-only)
+
+A simple helper wrapper for player PersistentDataContainers, making read/write operations for player-bound data easy and clean.
+
+```java
+import dev.oum.oumlib.util.PlayerData;
+
+PlayerData data = PlayerData.of(player);
+
+// Set player-bound persistent values
+data.set("rank", "MVP");
+data.setInt("coins", 500);
+data.setBoolean("claimed-reward", true);
+
+// Get values
+String rank = data.getOrDefault("rank", "Default");
+int coins = data.getIntOrDefault("coins", 0);
+boolean claimed = data.getBooleanOrDefault("claimed-reward", false);
+```
+
+---
+
+## 9. Permission Builder
+
+A cross-platform permission checker and builder that automatically registers permissions on Paper/Bukkit with default permission states.
+
+```java
+import dev.oum.oumlib.util.Permission;
+
+Permission adminPerm = Permission.builder("myplugin.admin")
+    .description("Allows admin commands access.")
+    .defaultValue(Permission.Default.OP) // Auto-registers with OP default on Paper
+    .build();
+
+if (adminPerm.has(sender)) {
+    // Perform admin actions...
+}
 ```

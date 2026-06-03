@@ -9,11 +9,9 @@ import org.jspecify.annotations.Nullable;
 
 public final class Players {
 
-    private Players() {}
+    private Players() {
+    }
 
-    /**
-     * Gets the exact block the player is looking at within a maximum distance.
-     */
     public static @Nullable Block getTargetBlock(@NonNull Player player, int maxDistance) {
         RayTraceResult result = player.getWorld().rayTraceBlocks(
                 player.getEyeLocation(),
@@ -23,9 +21,6 @@ public final class Players {
         return result != null ? result.getHitBlock() : null;
     }
 
-    /**
-     * Gets the entity the player is targeting within a maximum distance.
-     */
     public static @Nullable Entity getTargetEntity(@NonNull Player player, int maxDistance) {
         RayTraceResult result = player.getWorld().rayTraceEntities(
                 player.getEyeLocation(),

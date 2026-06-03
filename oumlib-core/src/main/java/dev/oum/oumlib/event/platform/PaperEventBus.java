@@ -30,6 +30,18 @@ public final class PaperEventBus implements EventBusAdapter {
         return instance;
     }
 
+    @Contract(pure = true)
+    private static org.bukkit.event.EventPriority toBukkitPriority(dev.oum.oumlib.event.@NonNull EventPriority priority) {
+        return switch (priority) {
+            case LOWEST -> org.bukkit.event.EventPriority.LOWEST;
+            case LOW -> org.bukkit.event.EventPriority.LOW;
+            case NORMAL -> org.bukkit.event.EventPriority.NORMAL;
+            case HIGH -> org.bukkit.event.EventPriority.HIGH;
+            case HIGHEST -> org.bukkit.event.EventPriority.HIGHEST;
+            case MONITOR -> org.bukkit.event.EventPriority.MONITOR;
+        };
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public <E> @NonNull ListenerHandle register(@NonNull EventBuilder<E> builder) {
@@ -37,7 +49,8 @@ public final class PaperEventBus implements EventBusAdapter {
         AtomicInteger fireCount = new AtomicInteger();
         Instant expiry = builder.expireAfter() != null ? Instant.now().plus(builder.expireAfter()) : null;
 
-        Listener listener = new Listener() {};
+        Listener listener = new Listener() {
+        };
 
         ListenerHandle handle = new ListenerHandle(() -> org.bukkit.event.HandlerList.unregisterAll(listener));
 
@@ -73,17 +86,5 @@ public final class PaperEventBus implements EventBusAdapter {
         );
 
         return handle;
-    }
-
-    @Contract(pure = true)
-    private static org.bukkit.event.EventPriority toBukkitPriority(dev.oum.oumlib.event.@NonNull EventPriority priority) {
-        return switch (priority) {
-            case LOWEST -> org.bukkit.event.EventPriority.LOWEST;
-            case LOW -> org.bukkit.event.EventPriority.LOW;
-            case NORMAL -> org.bukkit.event.EventPriority.NORMAL;
-            case HIGH -> org.bukkit.event.EventPriority.HIGH;
-            case HIGHEST -> org.bukkit.event.EventPriority.HIGHEST;
-            case MONITOR -> org.bukkit.event.EventPriority.MONITOR;
-        };
     }
 }

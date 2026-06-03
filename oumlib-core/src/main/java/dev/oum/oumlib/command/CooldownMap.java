@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Deprecated(forRemoval = true, since = "1.0.1")
 public final class CooldownMap {
 
     private final Map<UUID, Instant> timestamps = new ConcurrentHashMap<>();

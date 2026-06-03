@@ -1,6 +1,10 @@
 package dev.oum.oumlib.command;
 
+import dev.oum.oumlib.text.Localization;
 import net.kyori.adventure.audience.Audience;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.jspecify.annotations.NonNull;
 
 public record CommandContext(
@@ -63,5 +67,17 @@ public record CommandContext(
     public boolean isConsole() {
         return (BUKKIT_CONSOLE != null && BUKKIT_CONSOLE.isInstance(sender))
                 || (VELOCITY_CONSOLE != null && VELOCITY_CONSOLE.isInstance(sender));
+    }
+
+    public void reply(@NonNull Component component) {
+        sender.sendMessage(component);
+    }
+
+    public void reply(@NonNull String miniMessage, TagResolver... resolvers) {
+        sender.sendMessage(MiniMessage.miniMessage().deserialize(miniMessage, resolvers));
+    }
+
+    public void sendTranslated(@NonNull String key, TagResolver... resolvers) {
+        sender.sendMessage(Localization.translateFor(sender, key, resolvers));
     }
 }

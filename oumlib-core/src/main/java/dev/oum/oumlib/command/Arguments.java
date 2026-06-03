@@ -5,6 +5,7 @@ import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import dev.oum.oumlib.OumLib;
+import dev.oum.oumlib.util.Format;
 import org.bukkit.Material;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
@@ -53,6 +54,7 @@ public final class Arguments {
     }
 
     @Contract("_ -> new")
+    @SuppressWarnings("DataFlowIssue")
     public static @NonNull Argument<?> player(String name) {
         try {
             Class.forName("io.papermc.paper.command.brigadier.argument.ArgumentTypes");
@@ -93,14 +95,11 @@ public final class Arguments {
     @Contract("_ -> new")
     public static @NonNull Argument<Duration> duration(String name) {
         return new Argument<>(name, StringArgumentType.word(), (raw, ctx)
-                -> parseDuration(raw.toString()));
+                -> Format.parseDuration(raw.toString()));
     }
 
-    private static Duration parseDuration(@NonNull String input) {
-        if (input.endsWith("d")) return Duration.ofDays(Long.parseLong(input.replace("d", "")));
-        if (input.endsWith("h")) return Duration.ofHours(Long.parseLong(input.replace("h", "")));
-        if (input.endsWith("m")) return Duration.ofMinutes(Long.parseLong(input.replace("m", "")));
-        if (input.endsWith("s")) return Duration.ofSeconds(Long.parseLong(input.replace("s", "")));
-        return Duration.ofSeconds(Long.parseLong(input));
+    @Deprecated(since = "1.0.1", forRemoval = true)
+    public static Duration parseDuration(@NonNull String input) {
+        return Format.parseDuration(input);
     }
 }

@@ -1,6 +1,8 @@
 package dev.oum.oumlib.command;
 
 import dev.oum.oumlib.OumLib;
+import dev.oum.oumlib.util.Cooldown;
+import dev.oum.oumlib.util.Permission;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 
@@ -12,21 +14,27 @@ import java.util.function.Consumer;
 public final class CommandBuilder {
 
     private final String label;
-    private String description = "";
-    private String permission;
-    private String cooldownMessage = "<red>Wait <remaining>s before using this again.";
     private final List<Argument<?>> arguments = new ArrayList<>();
     private final List<SubcommandBuilder> subcommands = new ArrayList<>();
-    private Consumer<CommandContext> executor;
     private final List<String> aliases = new ArrayList<>();
-    private CooldownMap cooldownMap;
+    private String description = "";
+    private String permission;
+    private Permission permissionObject;
+    private String cooldownMessage = "<red>Wait <remaining>s before using this again.";
+    private Consumer<CommandContext> executor;
+    private Cooldown cooldown;
 
     private CommandBuilder(String label) {
         this.label = label;
     }
 
     @Contract("_ -> new")
-    static @NonNull CommandBuilder create(String label) {
+    public static @NonNull CommandBuilder create(String label) {
+        return new CommandBuilder(label);
+    }
+
+    @Contract("_ -> new")
+    public static @NonNull CommandBuilder literal(String label) {
         return new CommandBuilder(label);
     }
 
@@ -40,13 +48,19 @@ public final class CommandBuilder {
         return this;
     }
 
+    public CommandBuilder permission(Permission permission) {
+        this.permissionObject = permission;
+        this.permission = permission.name();
+        return this;
+    }
+
     public CommandBuilder aliases(String... a) {
         aliases.addAll(List.of(a));
         return this;
     }
 
     public CommandBuilder cooldown(Duration duration) {
-        this.cooldownMap = new CooldownMap(duration);
+        this.cooldown = new Cooldown(duration);
         return this;
     }
 
@@ -101,6 +115,10 @@ public final class CommandBuilder {
         return permission;
     }
 
+    public Permission permissionObject() {
+        return permissionObject;
+    }
+
     public String cooldownMessage() {
         return cooldownMessage;
     }
@@ -121,7 +139,7 @@ public final class CommandBuilder {
         return aliases;
     }
 
-    public CooldownMap cooldownMap() {
-        return cooldownMap;
+    public Cooldown cooldown() {
+        return cooldown;
     }
 }

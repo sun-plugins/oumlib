@@ -123,3 +123,64 @@ ItemStack copied = ItemBuilder.of(item1)
 // .amount(int) - Sets stack quantity
 // .flag(ItemFlag...) - Adds specific item flags
 ```
+
+---
+
+## 5. AnvilMenu Reference
+
+`AnvilMenu` provides a simple way to prompt players for text input using Minecraft's anvil interface.
+
+```java
+import dev.oum.oumlib.inventory.AnvilMenu;
+
+AnvilMenu menu = AnvilMenu.builder()
+    .title("<blue>Rename Item</blue>")
+    .placeholder("Enter new name...")
+    .onConfirm((player, text) -> {
+        player.sendMessage("You entered: " + text);
+    })
+    .onClose(player -> {
+        player.sendMessage("You cancelled the input.");
+    })
+    .build();
+
+// Open the menu for a player
+menu.open(player);
+```
+
+---
+
+## 6. PaginatedMenu Reference
+
+`PaginatedMenu` simplifies displaying lists of items across multiple pages, handling page navigation arrows and content distribution automatically.
+
+```java
+import dev.oum.oumlib.inventory.ItemBuilder;
+import dev.oum.oumlib.inventory.PaginatedMenu;
+import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
+import java.util.ArrayList;
+import java.util.List;
+
+List<ItemStack> items = new ArrayList<>();
+for (int i = 1; i <= 50; i++) {
+    items.add(ItemBuilder.of(Material.GOLD_INGOT)
+        .name("<yellow>Reward #" + i + "</yellow>")
+        .build());
+}
+
+PaginatedMenu menu = PaginatedMenu.builder()
+    .title("<dark_gray>Rewards Selection (<page>/<total>)</dark_gray>")
+    .rows(6)
+    // The slots where content items are populated
+    .contentSlots(10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25)
+    .items(items)
+    // Optional click handler for when a content item is clicked
+    .onClick((context, item, index) -> {
+        context.player().sendMessage("You clicked index " + index);
+    })
+    .build();
+
+// Open the menu for a player
+menu.open(player);
+```

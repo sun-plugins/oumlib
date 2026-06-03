@@ -5,6 +5,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.Contract;
@@ -33,6 +34,11 @@ public final class ChestMenu implements Menu {
         this.layout = builder.layout;
         this.slotHandlers = Map.copyOf(builder.slotHandlers);
         registerClickListener();
+    }
+
+    @Contract(" -> new")
+    public static @NonNull Builder builder() {
+        return new Builder();
     }
 
     @Override
@@ -75,19 +81,22 @@ public final class ChestMenu implements Menu {
                 handler.accept(new ClickContext(player, ClickAction.from(event.getClick()), event.getSlot()));
             }
         });
-    }
 
-    @Contract(" -> new")
-    public static @NonNull Builder builder() {
-        return new Builder();
+        Events.listen(InventoryCloseEvent.class, event -> {
+            if (!(event.getPlayer() instanceof Player player)) return;
+            Inventory inv = open.get(player.getUniqueId());
+            if (inv != null && event.getInventory().equals(inv)) {
+                open.remove(player.getUniqueId());
+            }
+        });
     }
 
     public static final class Builder {
 
+        private final Map<Integer, Consumer<ClickContext>> slotHandlers = new HashMap<>();
         private String title = "<gray>Menu";
         private int rows = 3;
         private Layout layout;
-        private final Map<Integer, Consumer<ClickContext>> slotHandlers = new HashMap<>();
 
         public Builder title(String title) {
             this.title = title;
@@ -127,7 +136,8 @@ public final class ChestMenu implements Menu {
             return this;
         }
 
-        public Builder onClick(List<Integer> slots, Consumer<ClickContext> handler) {
+        @Contract("_, _ -> this")
+        public Builder onClick(@NonNull List<Integer> slots, Consumer<ClickContext> handler) {
             slots.forEach(slot -> slotHandlers.put(slot, handler));
             return this;
         }

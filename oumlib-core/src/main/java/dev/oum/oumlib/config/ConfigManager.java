@@ -3,11 +3,8 @@ package dev.oum.oumlib.config;
 import dev.oum.oumlib.OumLib;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.RecordComponent;
@@ -21,6 +18,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+@SuppressWarnings("UnusedReturnValue")
 public final class ConfigManager<T extends Record & ConfigSection> {
 
     private final String fileName;
@@ -42,6 +40,83 @@ public final class ConfigManager<T extends Record & ConfigSection> {
             Supplier<T> defaults
     ) {
         return new ConfigManager<>(type, fileName, defaults);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Object reconstructValue(Object val, Class<?> targetType, Object defaultVal) {
+        if (Record.class.isAssignableFrom(targetType) && ConfigSection.class.isAssignableFrom(targetType)) {
+            Class<? extends Record> recordType = (Class<? extends Record>) targetType;
+            Map<String, Object> valMap;
+            if (val instanceof Map) {
+                valMap = (Map<String, Object>) val;
+            } else {
+                valMap = new HashMap<>();
+            }
+
+            RecordComponent[] comps = recordType.getRecordComponents();
+            Object[] args = new Object[comps.length];
+            Class<?>[] types = new Class<?>[comps.length];
+            for (int i = 0; i < comps.length; i++) {
+                RecordComponent comp = comps[i];
+                String key = toKebab(comp.getName());
+                Object memberVal = valMap.get(key);
+                Object memberDefault = null;
+                if (defaultVal != null) {
+                    try {
+                        memberDefault = comp.getAccessor().invoke(defaultVal);
+                    } catch (Exception ignored) {
+                    }
+                }
+
+                args[i] = reconstructValue(memberVal != null ? memberVal : memberDefault, comp.getType(), memberDefault);
+                types[i] = comp.getType();
+            }
+
+            try {
+                return recordType.getDeclaredConstructor(types).newInstance(args);
+            } catch (Exception e) {
+                OumLib.logError("Failed to reconstruct nested record " + targetType.getSimpleName() + ", using defaults.", e);
+                return defaultVal;
+            }
+        }
+        return val != null ? val : defaultVal;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static boolean isMissingKey(Map<String, Object> yamlMap, Class<?> targetType) {
+        if (yamlMap == null) return true;
+        if (Record.class.isAssignableFrom(targetType) && ConfigSection.class.isAssignableFrom(targetType)) {
+            for (RecordComponent comp : targetType.getRecordComponents()) {
+                String key = toKebab(comp.getName());
+                if (!yamlMap.containsKey(key)) {
+                    return true;
+                }
+                Object subVal = yamlMap.get(key);
+                if (Record.class.isAssignableFrom(comp.getType()) && ConfigSection.class.isAssignableFrom(comp.getType())) {
+                    if (subVal instanceof Map<?, ?> subMap) {
+                        if (isMissingKey((Map<String, Object>) subMap, comp.getType())) {
+                            return true;
+                        }
+                    } else {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static String toYamlValue(Object value) {
+        if (value instanceof String s) return "\"" + s.replace("\"", "\\\"") + "\"";
+        if (value == null) return "null";
+        return String.valueOf(value);
+    }
+
+    private static @NonNull String toKebab(@NonNull String camel) {
+        return camel
+                .replaceAll("([a-z])([A-Z])", "$1-$2")
+                .replaceAll("([A-Z]+)([A-Z][a-z])", "$1-$2")
+                .toLowerCase();
     }
 
     public ConfigManager<T> onReload(Consumer<T> callback) {
@@ -102,7 +177,7 @@ public final class ConfigManager<T extends Record & ConfigSection> {
             return def;
         }
 
-        Map<String, Object> yaml = parseYaml(file);
+        Map<String, Object> yaml = YamlParser.parse(file);
 
         // Collect unknown keys the user may have added — preserved on save.
         Map<String, Object> unknownKeys = new LinkedHashMap<>();
@@ -117,81 +192,28 @@ public final class ConfigManager<T extends Record & ConfigSection> {
             if (!isKnown) unknownKeys.put(yamlKey, yaml.get(yamlKey));
         }
 
-        Map<String, Object> recordValues = mergeRecordValues(yaml, def);
-        T loaded = reconstruct(recordValues, def);
+        T loaded = type.cast(reconstructValue(yaml, type, def));
 
-        boolean needsSave = false;
-        String missingKey = null;
-        for (RecordComponent comp : type.getRecordComponents()) {
-            String key = toKebab(comp.getName());
-            if (!yaml.containsKey(key)) {
-                needsSave = true;
-                missingKey = key;
-                break;
-            }
-        }
+        boolean needsSave = isMissingKey(yaml, type);
         if (needsSave) {
-            OumLib.logError("ConfigManager: Saving config because of missing key '" + missingKey + "'. Keys in YAML: " + yaml.keySet());
             save(file, loaded, unknownKeys);
         }
 
         return loaded;
     }
 
-    private @NonNull Map<String, Object> mergeRecordValues(Map<String, Object> yaml, T def) {
-        Map<String, Object> result = new HashMap<>();
-        for (RecordComponent comp : type.getRecordComponents()) {
-            String key = toKebab(comp.getName());
-            if (yaml.containsKey(key)) {
-                result.put(comp.getName(), yaml.get(key));
-            } else {
-                try {
-                    result.put(comp.getName(), comp.getAccessor().invoke(def));
-                } catch (Exception e) {
-                    result.put(comp.getName(), null);
-                }
-            }
+    private void save(@NonNull File file, T config, @NonNull Map<String, Object> preservedUnknown) {
+        File parent = file.getParentFile();
+        if (parent != null) {
+            boolean ignored = parent.mkdirs();
         }
-        return result;
-    }
-
-    private T reconstruct(Map<String, Object> values, T def) {
-        RecordComponent[] comps = type.getRecordComponents();
-        Object[] args = new Object[comps.length];
-        Class<?>[] types = new Class<?>[comps.length];
-        for (int i = 0; i < comps.length; i++) {
-            args[i] = values.get(comps[i].getName());
-            types[i] = comps[i].getType();
-        }
-        try {
-            return type.getDeclaredConstructor(types).newInstance(args);
-        } catch (Exception e) {
-            OumLib.logError("Failed to reconstruct " + fileName + ", using defaults.", e);
-            return def;
-        }
-    }
-
-    private void save(@NonNull File file, T config, Map<String, Object> preservedUnknown) {
-        file.getParentFile().mkdirs();
         StringBuilder yaml = new StringBuilder();
 
-        for (RecordComponent comp : type.getRecordComponents()) {
-            Comment comment = comp.getAnnotation(Comment.class);
-            if (comment != null) {
-                for (String line : comment.value()) {
-                    yaml.append("# ").append(line).append('\n');
-                }
-            }
-            try {
-                Object value = comp.getAccessor().invoke(config);
-                yaml.append(toKebab(comp.getName())).append(": ").append(toYamlValue(value)).append('\n');
-            } catch (Exception ignored) {
-            }
-        }
+        writeRecord(yaml, config, 0);
 
         if (!preservedUnknown.isEmpty()) {
             yaml.append("\n# Additional keys\n");
-            preservedUnknown.forEach((k, v) -> yaml.append(k).append(": ").append(toYamlValue(v)).append('\n'));
+            writeMap(yaml, preservedUnknown, 0);
         }
 
         try (FileWriter writer = new FileWriter(file)) {
@@ -201,63 +223,46 @@ public final class ConfigManager<T extends Record & ConfigSection> {
         }
     }
 
-    private static Map<String, Object> parseYaml(File file) {
-        Map<String, Object> map = new LinkedHashMap<>();
-        if (!file.exists()) return map;
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty() || line.startsWith("#")) continue;
-                int colon = line.indexOf(':');
-                if (colon == -1) continue;
-                String key = line.substring(0, colon).trim();
-                String valStr = line.substring(colon + 1).trim();
-
-                Object val = getObject(valStr);
-                map.put(key, val);
-            }
-        } catch (IOException ignored) {
-        }
-        return map;
-    }
-
-    private static @Nullable Object getObject(@NonNull String valStr) {
-        Object val;
-        if (valStr.startsWith("\"") && valStr.endsWith("\"")) {
-            val = valStr.substring(1, valStr.length() - 1).replace("\\\"", "\"");
-        } else if (valStr.startsWith("'") && valStr.endsWith("'")) {
-            val = valStr.substring(1, valStr.length() - 1);
-        } else if (valStr.equalsIgnoreCase("true")) {
-            val = true;
-        } else if (valStr.equalsIgnoreCase("false")) {
-            val = false;
-        } else if (valStr.equalsIgnoreCase("null")) {
-            val = null;
-        } else {
-            try {
-                if (valStr.contains(".")) {
-                    val = Double.parseDouble(valStr);
-                } else {
-                    val = Integer.parseInt(valStr);
+    @SuppressWarnings("unchecked")
+    private void writeRecord(StringBuilder yaml, @NonNull Record config, int indentLevel) {
+        String indent = "  ".repeat(indentLevel);
+        for (RecordComponent comp : config.getClass().getRecordComponents()) {
+            Comment comment = comp.getAnnotation(Comment.class);
+            if (comment != null) {
+                for (String line : comment.value()) {
+                    yaml.append(indent).append("# ").append(line).append('\n');
                 }
-            } catch (NumberFormatException e) {
-                val = valStr;
+            }
+            try {
+                Object value = comp.getAccessor().invoke(config);
+                String key = toKebab(comp.getName());
+                if (value instanceof Record subRecord && subRecord instanceof ConfigSection) {
+                    yaml.append(indent).append(key).append(":\n");
+                    writeRecord(yaml, subRecord, indentLevel + 1);
+                } else if (value instanceof Map<?, ?> map) {
+                    yaml.append(indent).append(key).append(":\n");
+                    writeMap(yaml, (Map<String, Object>) map, indentLevel + 1);
+                } else {
+                    yaml.append(indent).append(key).append(": ").append(toYamlValue(value)).append('\n');
+                }
+            } catch (Exception ignored) {
             }
         }
-        return val;
     }
 
-    private static String toYamlValue(Object value) {
-        if (value instanceof String s) return "\"" + s.replace("\"", "\\\"") + "\"";
-        if (value == null) return "null";
-        return String.valueOf(value);
-    }
-
-    private static @NonNull String toKebab(@NonNull String camel) {
-        return camel
-                .replaceAll("([a-z])([A-Z])", "$1-$2")
-                .replaceAll("([A-Z]+)([A-Z][a-z])", "$1-$2")
-                .toLowerCase();
+    @SuppressWarnings("unchecked")
+    private void writeMap(StringBuilder yaml, @NonNull Map<String, Object> map, int indentLevel) {
+        String indent = "  ".repeat(indentLevel);
+        map.forEach((k, v) -> {
+            if (v instanceof Record subRecord && subRecord instanceof ConfigSection) {
+                yaml.append(indent).append(k).append(":\n");
+                writeRecord(yaml, subRecord, indentLevel + 1);
+            } else if (v instanceof Map<?, ?> subMap) {
+                yaml.append(indent).append(k).append(":\n");
+                writeMap(yaml, (Map<String, Object>) subMap, indentLevel + 1);
+            } else {
+                yaml.append(indent).append(k).append(": ").append(toYamlValue(v)).append('\n');
+            }
+        });
     }
 }

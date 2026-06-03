@@ -6,6 +6,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.Contract;
@@ -26,6 +27,7 @@ public final class PaginatedMenu implements Menu {
     private final Function<Integer, ItemStack> prevButton;
     private final Function<Integer, ItemStack> nextButton;
     private final List<ItemStack> items;
+    private final PaginatedClickHandler clickHandler;
     private final Map<UUID, Integer> pages = new HashMap<>();
     private final Map<UUID, Inventory> open = new HashMap<>();
 
@@ -38,7 +40,13 @@ public final class PaginatedMenu implements Menu {
         this.prevButton = builder.prevButton;
         this.nextButton = builder.nextButton;
         this.items = List.copyOf(builder.items);
+        this.clickHandler = builder.clickHandler;
         registerClickListener();
+    }
+
+    @Contract(" -> new")
+    public static @NonNull Builder builder() {
+        return new Builder();
     }
 
     public int totalPages() {
@@ -103,20 +111,48 @@ public final class PaginatedMenu implements Menu {
             if (slot == prevSlot && page > 1) {
                 pages.put(player.getUniqueId(), page - 1);
                 reopen(player);
+                return;
             } else if (slot == nextSlot && page < totalPages()) {
                 pages.put(player.getUniqueId(), page + 1);
                 reopen(player);
+                return;
+            }
+
+            if (clickHandler != null) {
+                for (int i = 0; i < contentSlots.length; i++) {
+                    if (contentSlots[i] == slot) {
+                        int idx = (page - 1) * contentSlots.length + i;
+                        if (idx < items.size()) {
+                            clickHandler.onClick(
+                                    new ClickContext(player, ClickAction.from(event.getClick()), slot),
+                                    items.get(idx),
+                                    idx
+                            );
+                        }
+                        break;
+                    }
+                }
+            }
+        });
+
+        Events.listen(InventoryCloseEvent.class, event -> {
+            if (!(event.getPlayer() instanceof Player player)) return;
+            Inventory inv = open.get(player.getUniqueId());
+            if (inv != null && event.getInventory().equals(inv)) {
+                open.remove(player.getUniqueId());
+                pages.remove(player.getUniqueId());
             }
         });
     }
 
-    @Contract(" -> new")
-    public static @NonNull Builder builder() {
-        return new Builder();
+    @FunctionalInterface
+    public interface PaginatedClickHandler {
+        void onClick(ClickContext ctx, ItemStack item, int index);
     }
 
     public static final class Builder {
 
+        private final List<ItemStack> items = new ArrayList<>();
         private String title = "<gray>Page <page>/<total>";
         private int rows = 6;
         private int[] contentSlots = {10, 11, 12, 13, 14, 15, 16};
@@ -126,7 +162,12 @@ public final class PaginatedMenu implements Menu {
                 .name("<gray>Previous").build();
         private Function<Integer, ItemStack> nextButton = _ -> ItemBuilder.of(Material.ARROW)
                 .name("<gray>Next").build();
-        private final List<ItemStack> items = new ArrayList<>();
+        private PaginatedClickHandler clickHandler;
+
+        public Builder onClick(PaginatedClickHandler handler) {
+            this.clickHandler = handler;
+            return this;
+        }
 
         public Builder title(String title) {
             this.title = title;

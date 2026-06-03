@@ -5,8 +5,8 @@ A lightweight, multi-platform library for Paper (Minecraft servers) and Velocity
 ## Requirements & Compatibility
 
 - **Java**: Java 25 or higher (utilizes Virtual Threads).
-- **Paper**: Version 1.20 or newer.
-- **Velocity**: Version 3.x or newer.
+- **Paper**: Version 1.21.4 or newer.
+- **Velocity**: Version 3.5.x or newer.
 - **Folia**: Fully compatible. Tasks run on safe async scheduler structures, and it supports Folia's multi-threaded tick environment.
 
 ---
@@ -25,12 +25,13 @@ Add the JitPack repository and the library dependency to your `pom.xml`.
 
 ### 2. Add Dependency
 If you are shading the library into your plugin, declare the compile-scope dependency below.
+Look for "VERSION" at our github releases page: [Releases](https://github.com/sun-mc-dev/oumlib/releases)
 
 ```xml
 <dependency>
     <groupId>com.github.sun-mc-dev.oumlib</groupId>
     <artifactId>oumlib-core</artifactId>
-    <version>1.0.0</version>
+    <version>VERSION</version>
     <scope>compile</scope>
 </dependency>
 ```
@@ -102,7 +103,7 @@ ConfigManager<MyConfig> config = ConfigManager.of(MyConfig.class, "config.yml",
 ).enableAutoReload();
 
 // 3. Register a command to open a GUI
-CommandBuilder.literal("admin")
+Commands.literal("admin")
     .permission("myplugin.admin")
     .subcommand(sub -> sub
         .label("menu")
@@ -119,13 +120,13 @@ CommandBuilder.literal("admin")
                     "#########"
                 )
                 .bind('B', ItemBuilder.of(Material.BOOK).name("<yellow>Broadcast</yellow>").build())
-                .onClick(13, click -> {
+                .onClick('B', click -> {
                     // Send message and close menu
                     Text.send(click.player(), config.get().broadcastMessage());
                     click.player().closeInventory();
                 })
                 .build()
-                .open((Player) context.sender());
+                .open(context.playerOrThrow());
         })
     ).register();
 ```
@@ -147,7 +148,7 @@ If you want to build the library yourself, or if you prefer to install it locall
    <dependency>
        <groupId>dev.oum</groupId>
        <artifactId>oumlib-core</artifactId>
-       <version>1.0.0</version>
+       <version>VERSION</version>
        <scope>compile</scope>
    </dependency>
    ```
@@ -161,8 +162,10 @@ Detailed guides for each package:
 - **[Main Setup & Initialization](docs/setup.md)**: How to initialize OumLib on Paper and Velocity.
 - **[Commands](docs/commands.md)**: A simple Brigadier-based command system with cooldowns.
 - **[Configurations](docs/configuration.md)**: Auto-reloading record-based configurations.
+- **[Database](docs/database.md)**: Non-blocking asynchronous SQLite and MySQL database helpers.
 - **[Events](docs/events.md)**: Dynamic, fluent event listeners for Paper and Velocity.
 - **[GUI & Chest Menus](docs/inventories.md)**: Easy chest menus with layouts and click actions.
 - **[Scheduler](docs/scheduler.md)**: Platform-agnostic scheduler for delayed and repeating tasks.
 - **[Text & Placeholders](docs/text.md)**: MiniMessage text presets and custom placeholders.
+- **[Plugin Bridges](docs/bridges.md)**: Economy, Custom Items, Nexo, and LuckPerms Permission Bridges.
 - **[General Utilities](docs/utilities.md)**: PDC wrappers, duration formatting, and location serialization.

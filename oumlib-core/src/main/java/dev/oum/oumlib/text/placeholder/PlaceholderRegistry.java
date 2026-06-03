@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public final class PlaceholderRegistry {
 
@@ -33,13 +34,31 @@ public final class PlaceholderRegistry {
         return this;
     }
 
-    public PlaceholderRegistry addGlobal(String key, java.util.function.Supplier<String> fn) {
+    public PlaceholderRegistry addGlobal(String key, Supplier<String> fn) {
         ensureNamespace();
         namespaces.get(currentNamespace).put(key, PlaceholderSupplier.ofGlobal(fn));
         return this;
     }
 
     public void register() {
+        try {
+            Class.forName("org.bukkit.Bukkit");
+            Class.forName("me.clip.placeholderapi.PlaceholderAPI");
+            Class<?> helperClass = Class.forName("dev.oum.oumlib.text.placeholder.bridge.PapiHelper");
+            Class<?> oumLibClass = Class.forName("dev.oum.oumlib.OumLib");
+            Object plugin = oumLibClass.getMethod("plugin").invoke(null);
+            Class<?> pluginClass = Class.forName("org.bukkit.plugin.Plugin");
+            helperClass.getMethod("register", pluginClass, PlaceholderRegistry.class)
+                    .invoke(null, plugin, this);
+        } catch (Throwable ignored) {
+        }
+
+        try {
+            Class.forName("io.github.miniplaceholders.api.Expansion");
+            Class<?> helperClass = Class.forName("dev.oum.oumlib.text.placeholder.bridge.MiniPlaceholdersHelper");
+            helperClass.getMethod("register", PlaceholderRegistry.class).invoke(null, this);
+        } catch (Throwable ignored) {
+        }
     }
 
     public @Nullable String resolve(String namespace, String key, Object player, Map<String, String> params) {
@@ -48,8 +67,8 @@ public final class PlaceholderRegistry {
         PlaceholderSupplier supplier = suppliers.get(key);
         if (supplier == null) return null;
         return switch (supplier) {
-            case PlaceholderSupplier.PlayerSupplier ps -> ps.fn().apply(player);
-            case PlaceholderSupplier.ParamSupplier ps -> ps.fn().apply(player, params);
+            case PlaceholderSupplier.PlayerSupplier ps -> player != null ? ps.fn().apply(player) : null;
+            case PlaceholderSupplier.ParamSupplier ps -> player != null ? ps.fn().apply(player, params) : null;
             case PlaceholderSupplier.GlobalSupplier gs -> gs.fn().get();
         };
     }

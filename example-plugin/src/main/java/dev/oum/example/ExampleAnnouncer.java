@@ -22,12 +22,6 @@ public final class ExampleAnnouncer {
     private static ConfigManager<PluginConfig> configManager;
     private static TaskGroup announcerGroup;
 
-    public record AnnouncerStats(
-            int joinCount,
-            int broadcastCount,
-            long uptimeSeconds
-    ) {}
-
     private static boolean checkIsPaper() {
         try {
             Class.forName("org.bukkit.Bukkit");
@@ -58,7 +52,8 @@ public final class ExampleAnnouncer {
                 .forNamespace("oumlib")
                 .add("uptime", player -> String.valueOf((System.currentTimeMillis() - startTime) / 1000))
                 .add("broadcasts", player -> String.valueOf(broadcastCount.get()))
-                .add("joins", player -> String.valueOf(joinCount.get()));
+                .add("joins", player -> String.valueOf(joinCount.get()))
+                .register();
 
         registerCommands();
     }
@@ -217,5 +212,12 @@ public final class ExampleAnnouncer {
         } else {
             VelocityAnnouncerHelper.broadcast(component);
         }
+    }
+
+    public record AnnouncerStats(
+            int joinCount,
+            int broadcastCount,
+            long uptimeSeconds
+    ) {
     }
 }

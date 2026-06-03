@@ -1,8 +1,10 @@
 package dev.oum.oumlib.text;
 
 import dev.oum.oumlib.OumLib;
+import dev.oum.oumlib.scheduler.Scheduler;
 import dev.oum.oumlib.text.placeholder.PlaceholderResolver;
 import net.kyori.adventure.audience.Audience;
+import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
@@ -71,6 +73,18 @@ public final class Text {
         OumLib.players().sendMessage(parse(resolved));
     }
 
+    public static void broadcastActionBar(String message, Object... pairs) {
+        OumLib.players().sendActionBar(parse(resolve(message, null, pairs)));
+    }
+
+    public static void broadcastTitle(String title, String subtitle, Duration fadeIn, Duration stay, Duration fadeOut) {
+        OumLib.players().showTitle(Title.title(parse(title), parse(subtitle), Title.Times.times(fadeIn, stay, fadeOut)));
+    }
+
+    public static void broadcastTitle(String title, String subtitle) {
+        broadcastTitle(title, subtitle, Duration.ofMillis(500), Duration.ofMillis(3000), Duration.ofMillis(500));
+    }
+
     @Contract(value = "_ -> new", pure = true)
     public static @NonNull TextBuilder builder(String message) {
         return new TextBuilder(message);
@@ -87,11 +101,11 @@ public final class Text {
         for (int i = 0; i + 1 < pairs.length; i += 2) {
             result = result.replace("<" + pairs[i] + ">", MM.escapeTags(String.valueOf(pairs[i + 1])));
         }
-        return player != null ? PlaceholderResolver.resolveInternal(result, player) : result;
+        return PlaceholderResolver.resolveInternal(result, player);
     }
 
     private static String resolve(String input, Object player) {
-        return player != null ? PlaceholderResolver.resolveInternal(input, player) : input;
+        return PlaceholderResolver.resolveInternal(input, player);
     }
 
     private static String injectRecord(String input, Record data) {
@@ -106,6 +120,21 @@ public final class Text {
         } catch (Exception ignored) {
         }
         return result;
+    }
+
+    public static @NonNull BossBar bossBar(@NonNull Audience audience, @NonNull String titleMiniMessage,
+                                           float progress, BossBar.@NonNull Color color, BossBar.@NonNull Overlay overlay) {
+        Component title = parse(titleMiniMessage);
+        BossBar bar = BossBar.bossBar(title, progress, color, overlay);
+        audience.showBossBar(bar);
+        return bar;
+    }
+
+    public static void bossBarTemporary(@NonNull Audience audience, @NonNull String titleMiniMessage,
+                                        float progress, BossBar.@NonNull Color color, BossBar.@NonNull Overlay overlay,
+                                        @NonNull Duration duration) {
+        BossBar bar = bossBar(audience, titleMiniMessage, progress, color, overlay);
+        Scheduler.runDelayed(duration, () -> audience.hideBossBar(bar));
     }
 
     public static final class Preset {

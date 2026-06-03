@@ -8,7 +8,7 @@ A command consists of literals (names), arguments (parameters), subcommands, exe
 
 ```java
 import dev.oum.oumlib.command.Arguments;
-import dev.oum.oumlib.command.CommandBuilder;
+import dev.oum.oumlib.command.Commands;
 import dev.oum.oumlib.text.Text;
 import java.time.Duration;
 import java.util.List;
@@ -20,7 +20,7 @@ public class MyCommands {
         var modeArg = Arguments.string("mode")
             .suggests(context -> List.of("survival", "creative", "adventure", "spectator"));
 
-        CommandBuilder.literal("gamemode")
+        Commands.literal("gamemode")
             .permission("myplugin.gamemode")
             .cooldown(
                 Duration.ofSeconds(5), 
@@ -43,14 +43,47 @@ public class MyCommands {
 
 ---
 
+## Command Permissions
+
+You can secure commands and subcommands using raw permission `String` nodes, or by using OumLib's cross-platform `Permission` utility:
+
+```java
+import dev.oum.oumlib.command.Commands;
+import dev.oum.oumlib.util.Permission;
+
+public class AdminCommand {
+
+    private static final Permission ADMIN_PERM = Permission.builder("myplugin.admin")
+        .description("Allows admin command execution")
+        .defaultValue(Permission.Default.OP)
+        .build();
+
+    public static void register() {
+        Commands.literal("admin")
+            .permission(ADMIN_PERM) // Natively supports OumLib's Permission objects
+            .executes(context -> {
+                Text.Preset.success(context.sender(), "Admin menu opened.");
+            })
+            .register();
+    }
+}
+```
+
+---
+
 ## The CommandContext Structure
 
 The `CommandContext` object represents the execution environment:
 
 - `context.sender()`: Returns the Kyori `Audience` representing the command executor. On Paper, this can be cast directly to a Bukkit `Player` or `ConsoleCommandSender`.
-- `context.source()`: The underlying platform execution source. On Paper, this is Brigadier's `CommandSourceStack`. On Velocity, it is a `CommandSource`.
+- `context.playerOrThrow()`: Returns the player object cast to the appropriate platform type, throwing an `IllegalStateException` if the sender is not a player.
 - `context.isPlayer()`: Utility check returning `true` if the sender is a player.
+- `context.isConsole()`: Utility check returning `true` if the sender is the console.
+- `context.source()`: The underlying platform execution source. On Paper, this is Brigadier's `CommandSourceStack`. On Velocity, it is a `CommandSource`.
 - `context.args()`: Accessor for parsed command arguments.
+- `context.reply(Component)`: Sends a pre-built Adventure `Component` to the sender.
+- `context.reply(String, TagResolver...)`: Parses a MiniMessage template with optional resolvers and sends it.
+- `context.sendTranslated(String, TagResolver...)`: Automatically detects the sender's language locale, resolves the translation key from `Localization` files, parses MiniMessage placeholders, and sends the localized message.
 
 ---
 
