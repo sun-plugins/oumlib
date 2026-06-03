@@ -68,8 +68,15 @@ public final class ConfigManager<T extends Record & ConfigSection> {
                     }
                 }
 
-                args[i] = reconstructValue(memberVal != null ? memberVal : memberDefault, comp.getType(), memberDefault);
                 types[i] = comp.getType();
+                if (memberVal != null && !types[i].isAssignableFrom(memberVal.getClass())) {
+                    if (types[i] == java.util.List.class) {
+                        memberVal = java.util.List.of(memberVal);
+                    } else {
+                        memberVal = null;
+                    }
+                }
+                args[i] = reconstructValue(memberVal != null ? memberVal : memberDefault, types[i], memberDefault);
             }
 
             try {
@@ -236,14 +243,23 @@ public final class ConfigManager<T extends Record & ConfigSection> {
             try {
                 Object value = comp.getAccessor().invoke(config);
                 String key = toKebab(comp.getName());
-                if (value instanceof Record subRecord && subRecord instanceof ConfigSection) {
-                    yaml.append(indent).append(key).append(":\n");
-                    writeRecord(yaml, subRecord, indentLevel + 1);
-                } else if (value instanceof Map<?, ?> map) {
-                    yaml.append(indent).append(key).append(":\n");
-                    writeMap(yaml, (Map<String, Object>) map, indentLevel + 1);
-                } else {
-                    yaml.append(indent).append(key).append(": ").append(toYamlValue(value)).append('\n');
+                switch (value) {
+                    case Record subRecord when subRecord instanceof ConfigSection -> {
+                        yaml.append(indent).append(key).append(":\n");
+                        writeRecord(yaml, subRecord, indentLevel + 1);
+                    }
+                    case Map<?, ?> map -> {
+                        yaml.append(indent).append(key).append(":\n");
+                        writeMap(yaml, (Map<String, Object>) map, indentLevel + 1);
+                    }
+                    case Iterable<?> iter -> {
+                        yaml.append(indent).append(key).append(":\n");
+                        for (Object item : iter) {
+                            yaml.append(indent).append("  - ").append(toYamlValue(item)).append('\n');
+                        }
+                    }
+                    case null, default ->
+                            yaml.append(indent).append(key).append(": ").append(toYamlValue(value)).append('\n');
                 }
             } catch (Exception ignored) {
             }
@@ -254,14 +270,22 @@ public final class ConfigManager<T extends Record & ConfigSection> {
     private void writeMap(StringBuilder yaml, @NonNull Map<String, Object> map, int indentLevel) {
         String indent = "  ".repeat(indentLevel);
         map.forEach((k, v) -> {
-            if (v instanceof Record subRecord && subRecord instanceof ConfigSection) {
-                yaml.append(indent).append(k).append(":\n");
-                writeRecord(yaml, subRecord, indentLevel + 1);
-            } else if (v instanceof Map<?, ?> subMap) {
-                yaml.append(indent).append(k).append(":\n");
-                writeMap(yaml, (Map<String, Object>) subMap, indentLevel + 1);
-            } else {
-                yaml.append(indent).append(k).append(": ").append(toYamlValue(v)).append('\n');
+            switch (v) {
+                case Record subRecord when subRecord instanceof ConfigSection -> {
+                    yaml.append(indent).append(k).append(":\n");
+                    writeRecord(yaml, subRecord, indentLevel + 1);
+                }
+                case Map<?, ?> subMap -> {
+                    yaml.append(indent).append(k).append(":\n");
+                    writeMap(yaml, (Map<String, Object>) subMap, indentLevel + 1);
+                }
+                case Iterable<?> iter -> {
+                    yaml.append(indent).append(k).append(":\n");
+                    for (Object item : iter) {
+                        yaml.append(indent).append("  - ").append(toYamlValue(item)).append('\n');
+                    }
+                }
+                case null, default -> yaml.append(indent).append(k).append(": ").append(toYamlValue(v)).append('\n');
             }
         });
     }

@@ -1,6 +1,7 @@
 package dev.oum.oumlib.inventory;
 
 import dev.oum.oumlib.event.Events;
+import dev.oum.oumlib.event.ListenerHandle;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -28,12 +29,14 @@ public final class ChestMenu implements Menu {
     private final Map<Integer, Consumer<ClickContext>> slotHandlers;
     private final Map<UUID, Inventory> open = new HashMap<>();
 
+    private ListenerHandle clickHandle;
+    private ListenerHandle closeHandle;
+
     private ChestMenu(@NonNull Builder builder) {
         this.title = builder.title;
         this.rows = builder.rows;
         this.layout = builder.layout;
         this.slotHandlers = Map.copyOf(builder.slotHandlers);
-        registerClickListener();
     }
 
     @Contract(" -> new")
@@ -46,6 +49,7 @@ public final class ChestMenu implements Menu {
         Inventory inv = Bukkit.createInventory(null, rows * 9, MM.deserialize(title));
         if (layout != null) layout.apply(inv);
         open.put(player.getUniqueId(), inv);
+        registerListeners();
         player.openInventory(inv);
     }
 
@@ -53,6 +57,9 @@ public final class ChestMenu implements Menu {
     public void close(@NonNull Player player) {
         open.remove(player.getUniqueId());
         player.closeInventory();
+        if (open.isEmpty()) {
+            unregisterListeners();
+        }
     }
 
     public void refresh(@NonNull Player player) {
@@ -69,8 +76,10 @@ public final class ChestMenu implements Menu {
         player.updateInventory();
     }
 
-    private void registerClickListener() {
-        Events.listen(InventoryClickEvent.class, event -> {
+    private synchronized void registerListeners() {
+        if (clickHandle != null && clickHandle.isActive()) return;
+
+        clickHandle = Events.listen(InventoryClickEvent.class, event -> {
             if (!(event.getWhoClicked() instanceof Player player)) return;
             Inventory inv = open.get(player.getUniqueId());
             if (inv == null) return;
@@ -82,13 +91,27 @@ public final class ChestMenu implements Menu {
             }
         });
 
-        Events.listen(InventoryCloseEvent.class, event -> {
+        closeHandle = Events.listen(InventoryCloseEvent.class, event -> {
             if (!(event.getPlayer() instanceof Player player)) return;
             Inventory inv = open.get(player.getUniqueId());
             if (inv != null && event.getInventory().equals(inv)) {
                 open.remove(player.getUniqueId());
+                if (open.isEmpty()) {
+                    unregisterListeners();
+                }
             }
         });
+    }
+
+    private synchronized void unregisterListeners() {
+        if (clickHandle != null) {
+            clickHandle.unregister();
+            clickHandle = null;
+        }
+        if (closeHandle != null) {
+            closeHandle.unregister();
+            closeHandle = null;
+        }
     }
 
     public static final class Builder {
