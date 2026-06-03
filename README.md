@@ -1,5 +1,7 @@
 # oumlib
 
+[![](https://jitpack.io/v/sun-mc-dev/oumlib.svg)](https://jitpack.io/#sun-mc-dev/oumlib)
+
 A lightweight, multi-platform library for Paper (Minecraft servers) and Velocity (proxies) built for Java 25. It helps developers write clean, boilerplate-free code.
 
 ## Requirements & Compatibility
