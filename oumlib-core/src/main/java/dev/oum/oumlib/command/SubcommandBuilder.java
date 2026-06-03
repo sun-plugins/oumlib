@@ -1,9 +1,9 @@
 package dev.oum.oumlib.command;
 
+import dev.oum.oumlib.util.Permission;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Unmodifiable;
 import org.jspecify.annotations.NonNull;
-import dev.oum.oumlib.util.Permission;
 
 import java.util.ArrayList;
 import java.util.List;

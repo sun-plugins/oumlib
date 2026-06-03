@@ -145,6 +145,11 @@ public final class PaginatedMenu implements Menu {
         });
     }
 
+    @FunctionalInterface
+    public interface PaginatedClickHandler {
+        void onClick(ClickContext ctx, ItemStack item, int index);
+    }
+
     public static final class Builder {
 
         private final List<ItemStack> items = new ArrayList<>();
@@ -200,10 +205,5 @@ public final class PaginatedMenu implements Menu {
         public @NonNull PaginatedMenu build() {
             return new PaginatedMenu(this);
         }
-    }
-
-    @FunctionalInterface
-    public interface PaginatedClickHandler {
-        void onClick(ClickContext ctx, ItemStack item, int index);
     }
 }

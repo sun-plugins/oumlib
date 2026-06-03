@@ -26,7 +26,8 @@ public final class Database {
     }
 
     public static @NonNull Database sqlite(@NonNull File file) {
-        return sqlite(file, _ -> {});
+        return sqlite(file, _ -> {
+        });
     }
 
     public static @NonNull Database sqlite(@NonNull File file, @NonNull Consumer<HikariConfig> configCustomizer) {
@@ -37,7 +38,7 @@ public final class Database {
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl("jdbc:sqlite:" + file.getAbsolutePath());
         config.setDriverClassName("org.sqlite.JDBC");
-        
+
         config.setMaximumPoolSize(1);
         config.setConnectionTestQuery("SELECT 1");
 
@@ -52,7 +53,8 @@ public final class Database {
             @NonNull String username,
             @NonNull String password
     ) {
-        return mysql(host, port, database, username, password, _ -> {});
+        return mysql(host, port, database, username, password, _ -> {
+        });
     }
 
     public static @NonNull Database mysql(
@@ -67,7 +69,7 @@ public final class Database {
         config.setJdbcUrl("jdbc:mysql://" + host + ":" + port + "/" + database);
         config.setUsername(username);
         config.setPassword(password);
-        
+
         config.addDataSourceProperty("cachePrepStmts", "true");
         config.addDataSourceProperty("prepStmtCacheSize", "250");
         config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
@@ -206,7 +208,8 @@ public final class Database {
                 } finally {
                     try {
                         conn.setAutoCommit(wasAutoCommit);
-                    } catch (SQLException ignored) {}
+                    } catch (SQLException ignored) {
+                    }
                 }
             } catch (SQLException e) {
                 throw new RuntimeException("SQL transaction execution failed", e);
@@ -221,8 +224,8 @@ public final class Database {
                 try (Statement stmt = conn.createStatement()) {
                     for (String sql : statements) {
                         String trimmed = sql.replaceAll("(?m)^\\s*--.*$", "") // remove line comments
-                                           .replaceAll("(?s)/\\*.*?\\*/", "") // remove block comments
-                                           .trim();
+                                .replaceAll("(?s)/\\*.*?\\*/", "") // remove block comments
+                                .trim();
                         if (!trimmed.isEmpty()) {
                             stmt.execute(trimmed);
                         }

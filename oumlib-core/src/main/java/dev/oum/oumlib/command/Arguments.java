@@ -5,11 +5,11 @@ import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import dev.oum.oumlib.OumLib;
+import dev.oum.oumlib.util.Format;
 import org.bukkit.Material;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 
-import dev.oum.oumlib.util.Format;
 import java.time.Duration;
 import java.util.Locale;
 

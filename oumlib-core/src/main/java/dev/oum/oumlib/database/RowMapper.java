@@ -1,6 +1,7 @@
 package dev.oum.oumlib.database;
 
 import org.jspecify.annotations.NonNull;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 

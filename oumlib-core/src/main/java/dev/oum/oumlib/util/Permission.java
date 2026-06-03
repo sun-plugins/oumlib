@@ -11,6 +11,7 @@ public final class Permission {
     private final String name;
     private final String description;
     private final Default defaultValue;
+
     private Permission(@NonNull Builder builder) {
         this.name = builder.name;
         this.description = builder.description;

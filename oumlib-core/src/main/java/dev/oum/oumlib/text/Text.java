@@ -122,6 +122,21 @@ public final class Text {
         return result;
     }
 
+    public static @NonNull BossBar bossBar(@NonNull Audience audience, @NonNull String titleMiniMessage,
+                                           float progress, BossBar.@NonNull Color color, BossBar.@NonNull Overlay overlay) {
+        Component title = parse(titleMiniMessage);
+        BossBar bar = BossBar.bossBar(title, progress, color, overlay);
+        audience.showBossBar(bar);
+        return bar;
+    }
+
+    public static void bossBarTemporary(@NonNull Audience audience, @NonNull String titleMiniMessage,
+                                        float progress, BossBar.@NonNull Color color, BossBar.@NonNull Overlay overlay,
+                                        @NonNull Duration duration) {
+        BossBar bar = bossBar(audience, titleMiniMessage, progress, color, overlay);
+        Scheduler.runDelayed(duration, () -> audience.hideBossBar(bar));
+    }
+
     public static final class Preset {
 
         private Preset() {
@@ -158,20 +173,5 @@ public final class Text {
         public static void warningBroadcast(String message, Object... pairs) {
             broadcast(OumLib.presets().prefix(dev.oum.oumlib.text.Preset.WARNING) + message, pairs);
         }
-    }
-
-    public static @NonNull BossBar bossBar(@NonNull Audience audience, @NonNull String titleMiniMessage,
-                                           float progress, BossBar.@NonNull Color color, BossBar.@NonNull Overlay overlay) {
-        Component title = parse(titleMiniMessage);
-        BossBar bar = BossBar.bossBar(title, progress, color, overlay);
-        audience.showBossBar(bar);
-        return bar;
-    }
-
-    public static void bossBarTemporary(@NonNull Audience audience, @NonNull String titleMiniMessage,
-                                        float progress, BossBar.@NonNull Color color, BossBar.@NonNull Overlay overlay,
-                                        @NonNull Duration duration) {
-        BossBar bar = bossBar(audience, titleMiniMessage, progress, color, overlay);
-        Scheduler.runDelayed(duration, () -> audience.hideBossBar(bar));
     }
 }
