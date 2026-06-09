@@ -62,16 +62,15 @@ public final class PaperCommandRegistrar implements CommandRegistrar {
             Consumer<CommandContext> exec,
             CommandBuilder builder
     ) {
-        if (args.isEmpty()) {
-            node.executes(ctx -> {
-                handleExecution(ctx.getSource(), new ArgumentMap(ctx), exec, builder);
-                return 1;
-            });
-            return;
-        }
+        node.executes(ctx -> {
+            handleExecution(ctx.getSource(), new ArgumentMap(ctx), exec, builder);
+            return 1;
+        });
 
-        RequiredArgumentBuilder<CommandSourceStack, ?> first = buildArgChain(args, exec, builder);
-        node.then(first);
+        if (!args.isEmpty()) {
+            RequiredArgumentBuilder<CommandSourceStack, ?> first = buildArgChain(args, exec, builder);
+            node.then(first);
+        }
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

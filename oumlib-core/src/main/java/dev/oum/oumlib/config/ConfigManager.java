@@ -7,13 +7,17 @@ import org.jspecify.annotations.NonNull;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;
+import java.lang.reflect.Type;
 import java.nio.file.FileSystems;
 import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -42,51 +46,117 @@ public final class ConfigManager<T extends Record & ConfigSection> {
         return new ConfigManager<>(type, fileName, defaults);
     }
 
-    @SuppressWarnings("unchecked")
-    private static Object reconstructValue(Object val, Class<?> targetType, Object defaultVal) {
-        if (Record.class.isAssignableFrom(targetType) && ConfigSection.class.isAssignableFrom(targetType)) {
-            Class<? extends Record> recordType = (Class<? extends Record>) targetType;
-            Map<String, Object> valMap;
-            if (val instanceof Map) {
-                valMap = (Map<String, Object>) val;
-            } else {
-                valMap = new HashMap<>();
-            }
+    private static Object convertValue(Object val, Class<?> targetType) {
+        if (val == null) return null;
+        if (targetType.isInstance(val)) return val;
 
-            RecordComponent[] comps = recordType.getRecordComponents();
-            Object[] args = new Object[comps.length];
-            Class<?>[] types = new Class<?>[comps.length];
-            for (int i = 0; i < comps.length; i++) {
-                RecordComponent comp = comps[i];
-                String key = toKebab(comp.getName());
-                Object memberVal = valMap.get(key);
-                Object memberDefault = null;
-                if (defaultVal != null) {
-                    try {
-                        memberDefault = comp.getAccessor().invoke(defaultVal);
-                    } catch (Exception ignored) {
-                    }
-                }
-
-                types[i] = comp.getType();
-                if (memberVal != null && !types[i].isAssignableFrom(memberVal.getClass())) {
-                    if (types[i] == java.util.List.class) {
-                        memberVal = java.util.List.of(memberVal);
-                    } else {
-                        memberVal = null;
-                    }
-                }
-                args[i] = reconstructValue(memberVal != null ? memberVal : memberDefault, types[i], memberDefault);
-            }
-
-            try {
-                return recordType.getDeclaredConstructor(types).newInstance(args);
-            } catch (Exception e) {
-                OumLib.logError("Failed to reconstruct nested record " + targetType.getSimpleName() + ", using defaults.", e);
-                return defaultVal;
+        if (targetType == boolean.class || targetType == Boolean.class) {
+            if (val instanceof Boolean b) return b;
+            if (val instanceof String s) return Boolean.parseBoolean(s);
+        }
+        if (targetType == int.class || targetType == Integer.class) {
+            if (val instanceof Number n) return n.intValue();
+            if (val instanceof String s) {
+                try { return Integer.parseInt(s); } catch (NumberFormatException ignored) {}
             }
         }
-        return val != null ? val : defaultVal;
+        if (targetType == double.class || targetType == Double.class) {
+            if (val instanceof Number n) return n.doubleValue();
+            if (val instanceof String s) {
+                try { return Double.parseDouble(s); } catch (NumberFormatException ignored) {}
+            }
+        }
+        if (targetType == float.class || targetType == Float.class) {
+            if (val instanceof Number n) return n.floatValue();
+            if (val instanceof String s) {
+                try { return Float.parseFloat(s); } catch (NumberFormatException ignored) {}
+            }
+        }
+        if (targetType == long.class || targetType == Long.class) {
+            if (val instanceof Number n) return n.longValue();
+            if (val instanceof String s) {
+                try { return Long.parseLong(s); } catch (NumberFormatException ignored) {}
+            }
+        }
+        if (targetType == short.class || targetType == Short.class) {
+            if (val instanceof Number n) return n.shortValue();
+            if (val instanceof String s) {
+                try { return Short.parseShort(s); } catch (NumberFormatException ignored) {}
+            }
+        }
+        if (targetType == byte.class || targetType == Byte.class) {
+            if (val instanceof Number n) return n.byteValue();
+            if (val instanceof String s) {
+                try { return Byte.parseByte(s); } catch (NumberFormatException ignored) {}
+            }
+        }
+
+        return val;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Object reconstructValue(Object val, Type targetType, Object defaultVal) {
+        if (targetType instanceof ParameterizedType pt) {
+            Class<?> rawType = (Class<?>) pt.getRawType();
+            if (List.class.isAssignableFrom(rawType)) {
+                if (val instanceof List<?> list) {
+                    Type elementType = pt.getActualTypeArguments()[0];
+                    List<Object> reconstructed = new ArrayList<>();
+                    for (Object item : list) {
+                        reconstructed.add(reconstructValue(item, elementType, null));
+                    }
+                    return reconstructed;
+                }
+            }
+            return reconstructValue(val, rawType, defaultVal);
+        }
+
+        if (targetType instanceof Class<?> clazz) {
+            if (Record.class.isAssignableFrom(clazz) && ConfigSection.class.isAssignableFrom(clazz)) {
+                Class<? extends Record> recordType = (Class<? extends Record>) clazz;
+                Map<String, Object> valMap;
+                if (val instanceof Map) {
+                    valMap = (Map<String, Object>) val;
+                } else {
+                    valMap = new HashMap<>();
+                }
+
+                RecordComponent[] comps = recordType.getRecordComponents();
+                Object[] args = new Object[comps.length];
+                Class<?>[] types = new Class<?>[comps.length];
+                for (int i = 0; i < comps.length; i++) {
+                    RecordComponent comp = comps[i];
+                    String key = toKebab(comp.getName());
+                    Object memberVal = valMap.get(key);
+                    Object memberDefault = null;
+                    if (defaultVal != null) {
+                        try {
+                            memberDefault = comp.getAccessor().invoke(defaultVal);
+                        } catch (Exception ignored) {
+                        }
+                    }
+
+                    types[i] = comp.getType();
+                    Type genericType = comp.getGenericType();
+                    Object converted = convertValue(memberVal, types[i]);
+                    if (converted == null && types[i] == List.class && memberVal != null) {
+                        converted = List.of(memberVal);
+                    }
+
+                    args[i] = reconstructValue(converted != null ? converted : memberDefault, genericType, memberDefault);
+                }
+
+                try {
+                    return recordType.getDeclaredConstructor(types).newInstance(args);
+                } catch (Exception e) {
+                    OumLib.logError("Failed to reconstruct nested record " + clazz.getSimpleName() + ", using defaults.", e);
+                    return defaultVal;
+                }
+            }
+            return val != null ? convertValue(val, clazz) : defaultVal;
+        }
+
+        return val;
     }
 
     @SuppressWarnings("unchecked")
@@ -180,14 +250,17 @@ public final class ConfigManager<T extends Record & ConfigSection> {
 
     private T load() {
         File file = new File(OumLib.getDataFolder(), fileName);
+        OumLib.logError("[DEBUG] Loading config file: " + file.getAbsolutePath() + " (Exists: " + file.exists() + ")");
         T def = defaults.get();
 
         if (!file.exists()) {
+            OumLib.logError("[DEBUG] Config file does not exist, saving defaults.");
             save(file, def, new LinkedHashMap<>());
             return def;
         }
 
         Map<String, Object> yaml = YamlParser.parse(file);
+        OumLib.logError("[DEBUG] Parsed YAML map: " + yaml);
 
         // Collect unknown keys the user may have added — preserved on save.
         Map<String, Object> unknownKeys = new LinkedHashMap<>();
@@ -203,9 +276,11 @@ public final class ConfigManager<T extends Record & ConfigSection> {
         }
 
         T loaded = type.cast(reconstructValue(yaml, type, def));
+        OumLib.logError("[DEBUG] Reconstructed config object: " + loaded);
 
         boolean needsSave = isMissingKey(yaml, type);
         if (needsSave) {
+            OumLib.logError("[DEBUG] Config missing keys, saving updated config.");
             save(file, loaded, unknownKeys);
         }
 
@@ -234,6 +309,45 @@ public final class ConfigManager<T extends Record & ConfigSection> {
     }
 
     @SuppressWarnings("unchecked")
+    private void writeRecordAsListItem(StringBuilder yaml, Record config, int indentLevel) {
+        String indent = "  ".repeat(indentLevel);
+        boolean first = true;
+        for (RecordComponent comp : config.getClass().getRecordComponents()) {
+            try {
+                Object value = comp.getAccessor().invoke(config);
+                String key = toKebab(comp.getName());
+                if (first) {
+                    yaml.append(indent).append("- ").append(key).append(": ");
+                    first = false;
+                } else {
+                    yaml.append(indent).append("  ").append(key).append(": ");
+                }
+
+                if (value instanceof Record subRecord && subRecord instanceof ConfigSection) {
+                    yaml.append('\n');
+                    writeRecord(yaml, subRecord, indentLevel + 2);
+                } else if (value instanceof Map<?, ?> map) {
+                    yaml.append('\n');
+                    writeMap(yaml, (Map<String, Object>) map, indentLevel + 2);
+                } else if (value instanceof Iterable<?> iter) {
+                    yaml.append('\n');
+                    String subIndent = "  ".repeat(indentLevel + 2);
+                    for (Object item : iter) {
+                        if (item instanceof Record subRec && subRec instanceof ConfigSection) {
+                            writeRecordAsListItem(yaml, subRec, indentLevel + 2);
+                        } else {
+                            yaml.append(subIndent).append("- ").append(toYamlValue(item)).append('\n');
+                        }
+                    }
+                } else {
+                    yaml.append(toYamlValue(value)).append('\n');
+                }
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
     private void writeRecord(StringBuilder yaml, @NonNull Record config, int indentLevel) {
         String indent = "  ".repeat(indentLevel);
         for (RecordComponent comp : config.getClass().getRecordComponents()) {
@@ -258,7 +372,11 @@ public final class ConfigManager<T extends Record & ConfigSection> {
                     case Iterable<?> iter -> {
                         yaml.append(indent).append(key).append(":\n");
                         for (Object item : iter) {
-                            yaml.append(indent).append("  - ").append(toYamlValue(item)).append('\n');
+                            if (item instanceof Record subRec && subRec instanceof ConfigSection) {
+                                writeRecordAsListItem(yaml, subRec, indentLevel + 1);
+                            } else {
+                                yaml.append(indent).append("  - ").append(toYamlValue(item)).append('\n');
+                            }
                         }
                     }
                     case null, default ->
@@ -285,7 +403,11 @@ public final class ConfigManager<T extends Record & ConfigSection> {
                 case Iterable<?> iter -> {
                     yaml.append(indent).append(k).append(":\n");
                     for (Object item : iter) {
-                        yaml.append(indent).append("  - ").append(toYamlValue(item)).append('\n');
+                        if (item instanceof Record subRec && subRec instanceof ConfigSection) {
+                            writeRecordAsListItem(yaml, subRec, indentLevel + 1);
+                        } else {
+                            yaml.append(indent).append("  - ").append(toYamlValue(item)).append('\n');
+                        }
                     }
                 }
                 case null, default -> yaml.append(indent).append(k).append(": ").append(toYamlValue(v)).append('\n');

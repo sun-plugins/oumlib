@@ -2,6 +2,7 @@ package dev.oum.oumlib.config;
 
 import org.jspecify.annotations.NonNull;
 import org.yaml.snakeyaml.Yaml;
+import dev.oum.oumlib.OumLib;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -21,6 +22,7 @@ public final class YamlParser {
         try (InputStream stream = new FileInputStream(file)) {
             return parse(stream);
         } catch (Exception e) {
+            OumLib.logError("Failed to parse YAML file: " + file.getPath(), e);
             return new LinkedHashMap<>();
         }
     }
@@ -35,6 +37,7 @@ public final class YamlParser {
             }
             return new LinkedHashMap<>();
         } catch (Exception e) {
+            OumLib.logError("Failed to parse YAML stream", e);
             return new LinkedHashMap<>();
         }
     }
