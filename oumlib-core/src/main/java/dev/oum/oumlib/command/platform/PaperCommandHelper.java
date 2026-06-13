@@ -4,7 +4,14 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.oum.oumlib.command.Argument;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.command.brigadier.argument.resolvers.BlockPositionResolver;
+import io.papermc.paper.command.brigadier.argument.resolvers.FinePositionResolver;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
+import io.papermc.paper.math.BlockPosition;
+import io.papermc.paper.math.FinePosition;
+import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
@@ -28,5 +35,53 @@ public final class PaperCommandHelper {
             }
             return players.isEmpty() ? null : players.getFirst();
         });
+    }
+
+    @Contract("_ -> new")
+    public static @NonNull Argument<Location> createFinePositionArgument(String name) {
+        return new Argument<>(name, ArgumentTypes.finePosition(), (raw, ctx) -> {
+            FinePositionResolver resolver = (FinePositionResolver) raw;
+            try {
+                FinePosition pos = resolver.resolve((CommandSourceStack) ctx.getSource());
+                return pos.toLocation(((CommandSourceStack) ctx.getSource()).getLocation().getWorld());
+            } catch (CommandSyntaxException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    @Contract("_ -> new")
+    public static @NonNull Argument<Location> createBlockPositionArgument(String name) {
+        return new Argument<>(name, ArgumentTypes.blockPosition(), (raw, ctx) -> {
+            BlockPositionResolver resolver = (BlockPositionResolver) raw;
+            try {
+                BlockPosition pos = resolver.resolve((CommandSourceStack) ctx.getSource());
+                return pos.toLocation(((CommandSourceStack) ctx.getSource()).getLocation().getWorld());
+            } catch (CommandSyntaxException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    @Contract("_ -> new")
+    public static @NonNull Argument<List<Player>> createPlayersArgument(String name) {
+        return new Argument<>(name, ArgumentTypes.players(), (raw, ctx) -> {
+            PlayerSelectorArgumentResolver resolver = (PlayerSelectorArgumentResolver) raw;
+            try {
+                return resolver.resolve((CommandSourceStack) ctx.getSource());
+            } catch (CommandSyntaxException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    @Contract("_ -> new")
+    public static @NonNull Argument<World> createWorldArgument(String name) {
+        return new Argument<>(name, ArgumentTypes.world(), (raw, ctx) -> (World) raw);
+    }
+
+    @Contract("_ -> new")
+    public static @NonNull Argument<NamespacedKey> createKeyArgument(String name) {
+        return new Argument<>(name, ArgumentTypes.key(), (raw, ctx) -> (NamespacedKey) raw);
     }
 }

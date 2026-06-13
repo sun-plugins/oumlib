@@ -165,3 +165,46 @@ player.sendMessage(Localization.translateFor(player, "general.welcome",
 Component msg = Localization.translate("general.no-permission");
 ```
 
+---
+
+## 7. Asynchronous Chat-based Text Input (TextInput)
+
+`TextInput` provides a clean, async, and non-blocking way to capture text input from players directly via the standard server chat, without opening graphical inventory UIs like anvils.
+
+It automatically intercepts the player's next chat message, cancels the chat event to prevent others from seeing the input, and passes it to your callback. It includes full session timeout handling, quit-listener cleanup, and customized cancellation keywords.
+
+```java
+import dev.oum.oumlib.text.TextInput;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import java.time.Duration;
+
+TextInput.builder()
+    // Define the prompt message sent to the player when the session starts
+    .prompt(MiniMessage.miniMessage().deserialize("<yellow>Please type your new home name (or type 'cancel' to exit):</yellow>"))
+    // Set a session timeout duration (defaults to 10s)
+    .timeout(Duration.ofSeconds(30))
+    // Custom cancellation word (defaults to "cancel", case-insensitive)
+    .cancelWord("cancel")
+    // Triggered if the session times out
+    .onTimeout(player -> {
+        player.sendMessage("Home creation timed out.");
+    })
+    // Triggered if the player cancels explicitly
+    .onCancel(player -> {
+        player.sendMessage("Home creation cancelled.");
+    })
+    // Core input callback. Return true to accept and end the session, 
+    // or false to reject (keeping the input session open for another attempt).
+    .onInput((player, message) -> {
+        if (message.length() < 3) {
+            player.sendMessage("Name is too short! Try again:");
+            return false; 
+        }
+        
+        homes.createHome(player, message);
+        player.sendMessage("Home '" + message + "' successfully created!");
+        return true; 
+    })
+    .start(player);
+```
+

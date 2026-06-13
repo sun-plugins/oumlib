@@ -1,8 +1,8 @@
 package dev.oum.oumlib.config;
 
+import dev.oum.oumlib.OumLib;
 import org.jspecify.annotations.NonNull;
 import org.yaml.snakeyaml.Yaml;
-import dev.oum.oumlib.OumLib;
 
 import java.io.File;
 import java.io.FileInputStream;

@@ -57,22 +57,34 @@ public final class BukkitSchedulerAdapter implements SchedulerAdapter {
     @Contract("_, _ -> new")
     @Override
     public @NonNull TaskHandle runLater(Duration delay, Runnable task) {
+        return runLater(toTicks(delay), task);
+    }
+
+    @Contract("_, _ -> new")
+    @Override
+    public @NonNull TaskHandle runLater(long ticks, Runnable task) {
         if (FOLIA) {
-            var scheduled = Bukkit.getGlobalRegionScheduler().runDelayed(plugin, t -> task.run(), toTicks(delay));
+            var scheduled = Bukkit.getGlobalRegionScheduler().runDelayed(plugin, t -> task.run(), ticks);
             return new TaskHandle(scheduled::cancel, scheduled::isCancelled);
         }
-        var scheduled = scheduler.runTaskLater(plugin, task, toTicks(delay));
+        var scheduled = scheduler.runTaskLater(plugin, task, ticks);
         return new TaskHandle(scheduled::cancel, scheduled::isCancelled);
     }
 
     @Contract("_, _, _ -> new")
     @Override
     public @NonNull TaskHandle runRepeating(Duration initialDelay, Duration interval, Runnable task) {
+        return runRepeating(toTicks(initialDelay), toTicks(interval), task);
+    }
+
+    @Contract("_, _, _ -> new")
+    @Override
+    public @NonNull TaskHandle runRepeating(long initialTicks, long periodTicks, Runnable task) {
         if (FOLIA) {
-            var scheduled = Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, t -> task.run(), toTicks(initialDelay), toTicks(interval));
+            var scheduled = Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, t -> task.run(), initialTicks, periodTicks);
             return new TaskHandle(scheduled::cancel, scheduled::isCancelled);
         }
-        var scheduled = scheduler.runTaskTimer(plugin, task, toTicks(initialDelay), toTicks(interval));
+        var scheduled = scheduler.runTaskTimer(plugin, task, initialTicks, periodTicks);
         return new TaskHandle(scheduled::cancel, scheduled::isCancelled);
     }
 

@@ -1,9 +1,11 @@
 package dev.oum.oumlib.command;
 
 import dev.oum.oumlib.util.Permission;
+import org.jetbrains.annotations.CheckReturnValue;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Unmodifiable;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,52 +19,57 @@ public final class SubcommandBuilder {
     private Permission permissionObject;
     private Consumer<CommandContext> executor;
 
-    public SubcommandBuilder label(String label) {
+    @CheckReturnValue
+    public @NonNull SubcommandBuilder label(@NonNull String label) {
         this.label = label;
         return this;
     }
 
-    public SubcommandBuilder permission(String permission) {
+    @CheckReturnValue
+    public @NonNull SubcommandBuilder permission(@NonNull String permission) {
         this.permission = permission;
         return this;
     }
 
-    public SubcommandBuilder permission(Permission permission) {
+    @CheckReturnValue
+    public @NonNull SubcommandBuilder permission(@NonNull Permission permission) {
         this.permissionObject = permission;
         this.permission = permission.name();
         return this;
     }
 
-    public SubcommandBuilder argument(Argument<?> argument) {
+    @CheckReturnValue
+    public @NonNull SubcommandBuilder argument(@NonNull Argument<?> argument) {
         arguments.add(argument);
         return this;
     }
 
-    public SubcommandBuilder executes(Consumer<CommandContext> executor) {
+    @CheckReturnValue
+    public @NonNull SubcommandBuilder executes(@NonNull Consumer<@NonNull CommandContext> executor) {
         this.executor = executor;
         return this;
     }
 
-    public String label() {
+    public @NonNull String label() {
         return label;
     }
 
-    public String permission() {
+    public @Nullable String permission() {
         return permission;
     }
 
-    public Permission permissionObject() {
+    public @Nullable Permission permissionObject() {
         return permissionObject;
     }
 
     @Contract(pure = true)
     @NonNull
     @Unmodifiable
-    public List<Argument<?>> arguments() {
+    public List<@NonNull Argument<?>> arguments() {
         return List.copyOf(arguments);
     }
 
-    public Consumer<CommandContext> executor() {
+    public @Nullable Consumer<@NonNull CommandContext> executor() {
         return executor;
     }
 }

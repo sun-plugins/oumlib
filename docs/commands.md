@@ -43,6 +43,35 @@ public class MyCommands {
 
 ---
 
+## Subcommands
+
+You can attach subcommands to your command builder using `.subcommand(Consumer<SubcommandBuilder>)`. Subcommands support their own permissions, arguments, and execution logic.
+
+```java
+Commands.literal("warp")
+    .permission("myplugin.warp")
+    .subcommand(sub -> sub
+        .label("create")
+        .permission("myplugin.warp.admin")
+        .argument(Arguments.string("name"))
+        .executes(context -> {
+            String name = context.args().get(0); // or fetch by Argument object
+            Text.Preset.success(context.sender(), "Warp created: " + name);
+        })
+    )
+    .subcommand(sub -> sub
+        .label("tp")
+        .argument(Arguments.string("name"))
+        .executes(context -> {
+            String name = context.args().get(0);
+            Text.Preset.info(context.sender(), "Teleporting to: " + name);
+        })
+    )
+    .register();
+```
+
+---
+
 ## Command Permissions
 
 You can secure commands and subcommands using raw permission `String` nodes, or by using OumLib's cross-platform `Permission` utility:

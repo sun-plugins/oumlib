@@ -2,16 +2,25 @@ package dev.oum.oumlib.database;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import dev.oum.oumlib.OumLib;
 import dev.oum.oumlib.scheduler.Promise;
+import org.jetbrains.annotations.CheckReturnValue;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.RecordComponent;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,16 +29,19 @@ import java.util.function.Consumer;
 public final class Database {
 
     private final HikariDataSource dataSource;
+    private long slowQueryThresholdMs = 50;
 
     private Database(@NonNull HikariConfig config) {
         this.dataSource = new HikariDataSource(config);
     }
 
+    @CheckReturnValue
     public static @NonNull Database sqlite(@NonNull File file) {
         return sqlite(file, cfg -> {
         });
     }
 
+    @CheckReturnValue
     public static @NonNull Database sqlite(@NonNull File file, @NonNull Consumer<HikariConfig> configCustomizer) {
         File parent = file.getParentFile();
         if (parent != null && !parent.exists()) {
@@ -46,6 +58,7 @@ public final class Database {
         return new Database(config);
     }
 
+    @CheckReturnValue
     public static @NonNull Database mysql(
             @NonNull String host,
             int port,
@@ -57,6 +70,7 @@ public final class Database {
         });
     }
 
+    @CheckReturnValue
     public static @NonNull Database mysql(
             @NonNull String host,
             int port,
@@ -91,6 +105,7 @@ public final class Database {
         return new Database(config);
     }
 
+    @CheckReturnValue
     public static @NonNull Database custom(@NonNull HikariConfig config) {
         return new Database(config);
     }
@@ -109,14 +124,29 @@ public final class Database {
         return dataSource;
     }
 
+    public void setSlowQueryThresholdMs(long ms) {
+        this.slowQueryThresholdMs = ms;
+    }
+
+    public long getSlowQueryThresholdMs() {
+        return slowQueryThresholdMs;
+    }
+
+    @CheckReturnValue
     public @NonNull Promise<Integer> executeUpdate(@NonNull String sql, Object... params) {
         return Promise.supplyVirtual(() -> {
+            long start = System.currentTimeMillis();
             try (Connection conn = getConnection();
                  PreparedStatement stmt = conn.prepareStatement(sql)) {
                 for (int i = 0; i < params.length; i++) {
                     stmt.setObject(i + 1, params[i]);
                 }
-                return stmt.executeUpdate();
+                int affected = stmt.executeUpdate();
+                long elapsed = System.currentTimeMillis() - start;
+                if (elapsed > slowQueryThresholdMs) {
+                    OumLib.logger().warning("SLOW UPDATE QUERY (" + elapsed + "ms): " + sql);
+                }
+                return affected;
             } catch (SQLException e) {
                 throw new RuntimeException("SQL update execution failed: " + sql, e);
             }
@@ -126,8 +156,10 @@ public final class Database {
     /**
      * Executes a SELECT query asynchronously using virtual threads and returns mapped results.
      */
+    @CheckReturnValue
     public @NonNull Promise<List<Map<String, Object>>> executeQuery(@NonNull String sql, Object... params) {
         return Promise.supplyVirtual(() -> {
+            long start = System.currentTimeMillis();
             try (Connection conn = getConnection();
                  PreparedStatement stmt = conn.prepareStatement(sql)) {
                 for (int i = 0; i < params.length; i++) {
@@ -144,6 +176,10 @@ public final class Database {
                         }
                         list.add(row);
                     }
+                    long elapsed = System.currentTimeMillis() - start;
+                    if (elapsed > slowQueryThresholdMs) {
+                        OumLib.logger().warning("SLOW SELECT QUERY (" + elapsed + "ms): " + sql);
+                    }
                     return list;
                 }
             } catch (SQLException e) {
@@ -152,8 +188,10 @@ public final class Database {
         });
     }
 
+    @CheckReturnValue
     public <T> @NonNull Promise<List<T>> executeQuery(@NonNull String sql, @NonNull RowMapper<T> mapper, Object... params) {
         return Promise.supplyVirtual(() -> {
+            long start = System.currentTimeMillis();
             try (Connection conn = getConnection();
                  PreparedStatement stmt = conn.prepareStatement(sql)) {
                 for (int i = 0; i < params.length; i++) {
@@ -164,6 +202,10 @@ public final class Database {
                     while (rs.next()) {
                         list.add(mapper.map(rs));
                     }
+                    long elapsed = System.currentTimeMillis() - start;
+                    if (elapsed > slowQueryThresholdMs) {
+                        OumLib.logger().warning("SLOW SELECT QUERY (" + elapsed + "ms): " + sql);
+                    }
                     return list;
                 }
             } catch (SQLException e) {
@@ -172,8 +214,93 @@ public final class Database {
         });
     }
 
+    @CheckReturnValue
+    public <T> @NonNull Promise<List<T>> executeQuery(@NonNull String sql, @NonNull Class<T> type, Object... params) {
+        return executeQuery(sql, rs -> {
+            try {
+                if (type.isRecord()) {
+                    RecordComponent[] components = type.getRecordComponents();
+                    Class<?>[] paramTypes = new Class<?>[components.length];
+                    Object[] args = new Object[components.length];
+                    for (int i = 0; i < components.length; i++) {
+                        RecordComponent comp = components[i];
+                        paramTypes[i] = comp.getType();
+                        args[i] = getValueFromResultSet(rs, comp.getName(), comp.getType());
+                    }
+                    Constructor<T> ctor = type.getDeclaredConstructor(paramTypes);
+                    ctor.setAccessible(true);
+                    return ctor.newInstance(args);
+                } else {
+                    T instance = type.getDeclaredConstructor().newInstance();
+                    ResultSetMetaData md = rs.getMetaData();
+                    int columns = md.getColumnCount();
+                    for (int i = 1; i <= columns; i++) {
+                        String label = md.getColumnLabel(i);
+                        try {
+                            Field field = type.getDeclaredField(label);
+                            field.setAccessible(true);
+                            field.set(instance, getValueFromResultSet(rs, label, field.getType()));
+                        } catch (NoSuchFieldException ignored) {
+                            String camel = toCamelCase(label);
+                            try {
+                                Field field = type.getDeclaredField(camel);
+                                field.setAccessible(true);
+                                field.set(instance, getValueFromResultSet(rs, label, field.getType()));
+                            } catch (NoSuchFieldException ignored2) {
+                            }
+                        }
+                    }
+                    return instance;
+                }
+            } catch (Exception e) {
+                throw new SQLException("Failed to map row to class " + type.getName(), e);
+            }
+        }, params);
+    }
+
+    private static @Nullable Object getValueFromResultSet(@NonNull ResultSet rs, @NonNull String label,
+                                                          @NonNull Class<?> type) throws SQLException {
+        Object val = rs.getObject(label);
+        if (val == null) return null;
+        if (type == int.class || type == Integer.class) {
+            return rs.getInt(label);
+        } else if (type == double.class || type == Double.class) {
+            return rs.getDouble(label);
+        } else if (type == float.class || type == Float.class) {
+            return rs.getFloat(label);
+        } else if (type == long.class || type == Long.class) {
+            return rs.getLong(label);
+        } else if (type == boolean.class || type == Boolean.class) {
+            return rs.getBoolean(label);
+        } else if (type == String.class) {
+            return rs.getString(label);
+        }
+        return val;
+    }
+
+    private static @NonNull String toCamelCase(@NonNull String snake) {
+        StringBuilder sb = new StringBuilder();
+        boolean nextUpper = false;
+        for (int i = 0; i < snake.length(); i++) {
+            char c = snake.charAt(i);
+            if (c == '_') {
+                nextUpper = true;
+            } else {
+                if (nextUpper) {
+                    sb.append(Character.toUpperCase(c));
+                    nextUpper = false;
+                } else {
+                    sb.append(Character.toLowerCase(c));
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    @CheckReturnValue
     public @NonNull Promise<int[]> executeBatch(@NonNull String sql, @NonNull List<Object[]> parameterBatch) {
         return Promise.supplyVirtual(() -> {
+            long start = System.currentTimeMillis();
             try (Connection conn = getConnection();
                  PreparedStatement stmt = conn.prepareStatement(sql)) {
                 for (Object[] params : parameterBatch) {
@@ -182,21 +309,32 @@ public final class Database {
                     }
                     stmt.addBatch();
                 }
-                return stmt.executeBatch();
+                int[] results = stmt.executeBatch();
+                long elapsed = System.currentTimeMillis() - start;
+                if (elapsed > slowQueryThresholdMs) {
+                    OumLib.logger().warning("SLOW BATCH QUERY (" + elapsed + "ms): " + sql);
+                }
+                return results;
             } catch (SQLException e) {
                 throw new RuntimeException("SQL batch execution failed: " + sql, e);
             }
         });
     }
 
+    @CheckReturnValue
     public <R> @NonNull Promise<R> transaction(@NonNull TransactionCallback<R> callback) {
         return Promise.supplyVirtual(() -> {
+            long start = System.currentTimeMillis();
             try (Connection conn = getConnection()) {
                 boolean wasAutoCommit = conn.getAutoCommit();
                 try {
                     conn.setAutoCommit(false);
                     R result = callback.execute(conn);
                     conn.commit();
+                    long elapsed = System.currentTimeMillis() - start;
+                    if (elapsed > slowQueryThresholdMs) {
+                        OumLib.logger().warning("SLOW TRANSACTION (" + elapsed + "ms)");
+                    }
                     return result;
                 } catch (Throwable t) {
                     try {
@@ -217,14 +355,15 @@ public final class Database {
         });
     }
 
+    @CheckReturnValue
     public @NonNull Promise<Void> executeScript(@NonNull String sqlScript) {
         return Promise.runVirtual(() -> {
             try (Connection conn = getConnection()) {
                 String[] statements = sqlScript.split(";");
                 try (Statement stmt = conn.createStatement()) {
                     for (String sql : statements) {
-                        String trimmed = sql.replaceAll("(?m)^\\s*--.*$", "") // remove line comments
-                                .replaceAll("(?s)/\\*.*?\\*/", "") // remove block comments
+                        String trimmed = sql.replaceAll("(?m)^\\s*--.*$", "")
+                                .replaceAll("(?s)/\\*.*?\\*/", "")
                                 .trim();
                         if (!trimmed.isEmpty()) {
                             stmt.execute(trimmed);
@@ -237,6 +376,7 @@ public final class Database {
         });
     }
 
+    @CheckReturnValue
     public @NonNull Promise<Void> executeScript(@NonNull InputStream stream) {
         return Promise.runVirtual(() -> {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
@@ -250,5 +390,97 @@ public final class Database {
                 throw new RuntimeException("SQL script loading failed", e);
             }
         });
+    }
+
+    public void runMigrations(@NonNull File folder) {
+        if (!folder.exists() || !folder.isDirectory()) {
+            return;
+        }
+        File[] files = folder.listFiles((dir, name) -> name.startsWith("V") && name.endsWith(".sql"));
+        if (files == null) return;
+        Arrays.sort(files, Comparator.comparing(File::getName));
+
+        executeUpdate("CREATE TABLE IF NOT EXISTS oumlib_schema_history (" +
+                "version INTEGER PRIMARY KEY, " +
+                "description VARCHAR(200) NOT NULL, " +
+                "script VARCHAR(200) NOT NULL, " +
+                "installed_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                ")").toCompletableFuture().join();
+
+        for (File file : files) {
+            String name = file.getName();
+            int version = parseVersion(name);
+            if (version == -1) continue;
+
+            List<Map<String, Object>> rows = executeQuery("SELECT version FROM oumlib_schema_history WHERE version = ?", version)
+                    .toCompletableFuture().join();
+            if (rows.isEmpty()) {
+                try (FileInputStream fis = new FileInputStream(file)) {
+                    executeScript(fis).toCompletableFuture().join();
+                    executeUpdate("INSERT INTO oumlib_schema_history (version, description, script) VALUES (?, ?, ?)",
+                            version, parseDescription(name), name).toCompletableFuture().join();
+                } catch (Exception e) {
+                    throw new RuntimeException("Migration " + name + " failed!", e);
+                }
+            }
+        }
+    }
+
+    public void runMigrations(@NonNull Class<?> resourceLoaderClass, String... resourcePaths) {
+        executeUpdate("CREATE TABLE IF NOT EXISTS oumlib_schema_history (" +
+                "version INTEGER PRIMARY KEY, " +
+                "description VARCHAR(200) NOT NULL, " +
+                "script VARCHAR(200) NOT NULL, " +
+                "installed_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                ")").toCompletableFuture().join();
+
+        Arrays.sort(resourcePaths, Comparator.comparing(path -> {
+            String filename = path.substring(path.lastIndexOf('/') + 1);
+            return parseVersion(filename);
+        }));
+
+        for (String path : resourcePaths) {
+            String filename = path.substring(path.lastIndexOf('/') + 1);
+            int version = parseVersion(filename);
+            if (version == -1) continue;
+
+            List<Map<String, Object>> rows = executeQuery("SELECT version FROM oumlib_schema_history WHERE version = ?", version)
+                    .toCompletableFuture().join();
+            if (rows.isEmpty()) {
+                try (InputStream is = resourceLoaderClass.getClassLoader().getResourceAsStream(path)) {
+                    if (is == null) {
+                        throw new IllegalArgumentException("Resource not found: " + path);
+                    }
+                    executeScript(is).toCompletableFuture().join();
+                    executeUpdate("INSERT INTO oumlib_schema_history (version, description, script) VALUES (?, ?, ?)",
+                            version, parseDescription(filename), filename).toCompletableFuture().join();
+                } catch (Exception e) {
+                    throw new RuntimeException("Migration " + filename + " failed!", e);
+                }
+            }
+        }
+    }
+
+    private static int parseVersion(@NonNull String filename) {
+        try {
+            int underscoreIdx = filename.indexOf("__");
+            if (underscoreIdx != -1) {
+                return Integer.parseInt(filename.substring(1, underscoreIdx));
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        return -1;
+    }
+
+    private static @NonNull String parseDescription(@NonNull String filename) {
+        int underscoreIdx = filename.indexOf("__");
+        if (underscoreIdx != -1) {
+            String desc = filename.substring(underscoreIdx + 2);
+            if (desc.endsWith(".sql")) {
+                desc = desc.substring(0, desc.length() - 4);
+            }
+            return desc.replace('_', ' ');
+        }
+        return filename;
     }
 }

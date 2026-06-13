@@ -14,11 +14,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -57,37 +53,55 @@ public final class ConfigManager<T extends Record & ConfigSection> {
         if (targetType == int.class || targetType == Integer.class) {
             if (val instanceof Number n) return n.intValue();
             if (val instanceof String s) {
-                try { return Integer.parseInt(s); } catch (NumberFormatException ignored) {}
+                try {
+                    return Integer.parseInt(s);
+                } catch (NumberFormatException ignored) {
+                }
             }
         }
         if (targetType == double.class || targetType == Double.class) {
             if (val instanceof Number n) return n.doubleValue();
             if (val instanceof String s) {
-                try { return Double.parseDouble(s); } catch (NumberFormatException ignored) {}
+                try {
+                    return Double.parseDouble(s);
+                } catch (NumberFormatException ignored) {
+                }
             }
         }
         if (targetType == float.class || targetType == Float.class) {
             if (val instanceof Number n) return n.floatValue();
             if (val instanceof String s) {
-                try { return Float.parseFloat(s); } catch (NumberFormatException ignored) {}
+                try {
+                    return Float.parseFloat(s);
+                } catch (NumberFormatException ignored) {
+                }
             }
         }
         if (targetType == long.class || targetType == Long.class) {
             if (val instanceof Number n) return n.longValue();
             if (val instanceof String s) {
-                try { return Long.parseLong(s); } catch (NumberFormatException ignored) {}
+                try {
+                    return Long.parseLong(s);
+                } catch (NumberFormatException ignored) {
+                }
             }
         }
         if (targetType == short.class || targetType == Short.class) {
             if (val instanceof Number n) return n.shortValue();
             if (val instanceof String s) {
-                try { return Short.parseShort(s); } catch (NumberFormatException ignored) {}
+                try {
+                    return Short.parseShort(s);
+                } catch (NumberFormatException ignored) {
+                }
             }
         }
         if (targetType == byte.class || targetType == Byte.class) {
             if (val instanceof Number n) return n.byteValue();
             if (val instanceof String s) {
-                try { return Byte.parseByte(s); } catch (NumberFormatException ignored) {}
+                try {
+                    return Byte.parseByte(s);
+                } catch (NumberFormatException ignored) {
+                }
             }
         }
 
@@ -250,17 +264,17 @@ public final class ConfigManager<T extends Record & ConfigSection> {
 
     private T load() {
         File file = new File(OumLib.getDataFolder(), fileName);
-        OumLib.logError("[DEBUG] Loading config file: " + file.getAbsolutePath() + " (Exists: " + file.exists() + ")");
+        OumLib.logDebug("Loading config file: " + file.getAbsolutePath() + " (Exists: " + file.exists() + ")");
         T def = defaults.get();
 
         if (!file.exists()) {
-            OumLib.logError("[DEBUG] Config file does not exist, saving defaults.");
+            OumLib.logDebug("Config file does not exist, saving defaults.");
             save(file, def, new LinkedHashMap<>());
             return def;
         }
 
         Map<String, Object> yaml = YamlParser.parse(file);
-        OumLib.logError("[DEBUG] Parsed YAML map: " + yaml);
+        OumLib.logDebug("Parsed YAML map: " + yaml);
 
         // Collect unknown keys the user may have added — preserved on save.
         Map<String, Object> unknownKeys = new LinkedHashMap<>();
@@ -276,11 +290,11 @@ public final class ConfigManager<T extends Record & ConfigSection> {
         }
 
         T loaded = type.cast(reconstructValue(yaml, type, def));
-        OumLib.logError("[DEBUG] Reconstructed config object: " + loaded);
+        OumLib.logDebug("Reconstructed config object: " + loaded);
 
         boolean needsSave = isMissingKey(yaml, type);
         if (needsSave) {
-            OumLib.logError("[DEBUG] Config missing keys, saving updated config.");
+            OumLib.logDebug("Config missing keys, saving updated config.");
             save(file, loaded, unknownKeys);
         }
 
@@ -309,7 +323,7 @@ public final class ConfigManager<T extends Record & ConfigSection> {
     }
 
     @SuppressWarnings("unchecked")
-    private void writeRecordAsListItem(StringBuilder yaml, Record config, int indentLevel) {
+    private void writeRecordAsListItem(StringBuilder yaml, @NonNull Record config, int indentLevel) {
         String indent = "  ".repeat(indentLevel);
         boolean first = true;
         for (RecordComponent comp : config.getClass().getRecordComponents()) {
@@ -323,24 +337,27 @@ public final class ConfigManager<T extends Record & ConfigSection> {
                     yaml.append(indent).append("  ").append(key).append(": ");
                 }
 
-                if (value instanceof Record subRecord && subRecord instanceof ConfigSection) {
-                    yaml.append('\n');
-                    writeRecord(yaml, subRecord, indentLevel + 2);
-                } else if (value instanceof Map<?, ?> map) {
-                    yaml.append('\n');
-                    writeMap(yaml, (Map<String, Object>) map, indentLevel + 2);
-                } else if (value instanceof Iterable<?> iter) {
-                    yaml.append('\n');
-                    String subIndent = "  ".repeat(indentLevel + 2);
-                    for (Object item : iter) {
-                        if (item instanceof Record subRec && subRec instanceof ConfigSection) {
-                            writeRecordAsListItem(yaml, subRec, indentLevel + 2);
-                        } else {
-                            yaml.append(subIndent).append("- ").append(toYamlValue(item)).append('\n');
+                switch (value) {
+                    case Record subRecord when subRecord instanceof ConfigSection -> {
+                        yaml.append('\n');
+                        writeRecord(yaml, subRecord, indentLevel + 2);
+                    }
+                    case Map<?, ?> map -> {
+                        yaml.append('\n');
+                        writeMap(yaml, (Map<String, Object>) map, indentLevel + 2);
+                    }
+                    case Iterable<?> iter -> {
+                        yaml.append('\n');
+                        String subIndent = "  ".repeat(indentLevel + 2);
+                        for (Object item : iter) {
+                            if (item instanceof Record subRec && subRec instanceof ConfigSection) {
+                                writeRecordAsListItem(yaml, subRec, indentLevel + 2);
+                            } else {
+                                yaml.append(subIndent).append("- ").append(toYamlValue(item)).append('\n');
+                            }
                         }
                     }
-                } else {
-                    yaml.append(toYamlValue(value)).append('\n');
+                    case null, default -> yaml.append(toYamlValue(value)).append('\n');
                 }
             } catch (Exception ignored) {
             }

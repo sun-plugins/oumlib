@@ -6,46 +6,62 @@ OumLib includes several practical helper classes to handle metadata, formatting,
 
 ## 1. Persistent Data Container (PDC) Helpers
 
-Attaching custom metadata to items is a key requirement for modern Minecraft plugins. OumLib makes writing and reading from PDC values simple.
+Attaching custom metadata to items, entities, chunks, block states, and more is a core requirement for plugins. OumLib provides a modern, unified, and type-safe PDC API that operates on both `ItemStack` and any `PersistentDataHolder`.
 
-### Writing PDC Values
-Use the chainable `.pdc(...)` methods on `ItemBuilder`:
-
-```java
-import dev.oum.oumlib.inventory.ItemBuilder;
-import org.bukkit.Material;
-import org.bukkit.inventory.ItemStack;
-import java.util.List;
-
-ItemStack sword = ItemBuilder.of(Material.DIAMOND_SWORD)
-    .name("<gold>Fire Sword</gold>")
-    .pdc("item-id", "fire_sword") // String key/value
-    .pdc("custom-damage", 15)     // Integer key/value
-    .pdc("multiplier", 1.5)       // Double key/value
-    .pdc("unlocked", true)        // Boolean key/value
-    .pdc("created-at", 1717300000L) // Long key/value
-    .pdc("tags", List.of("legendary", "fire")) // List<String> key/value
-    .build();
-```
-
-### Reading PDC Values
-Use the static methods in `Pdc` to fetch the metadata back from any `ItemStack`:
+### Accessing the PDC Wrapper
+Use `Pdc.of(item)` for items, or `Pdc.of(holder)` for entities, chunks, block states, etc.
 
 ```java
 import dev.oum.oumlib.util.Pdc;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.entity.Player;
 import java.util.List;
 
-ItemStack clickedItem = player.getInventory().getItemInMainHand();
+ItemStack sword = ...;
 
-// Read values (returns null if key doesn't exist)
-String itemId = Pdc.get(clickedItem, "item-id");
-Integer customDamage = Pdc.getInt(clickedItem, "custom-damage");
-Double multiplier = Pdc.getDouble(clickedItem, "multiplier");
-Boolean unlocked = Pdc.getBoolean(clickedItem, "unlocked");
-Long createdAt = Pdc.getLong(clickedItem, "created-at");
-List<String> tags = Pdc.getList(clickedItem, "tags");
+// Write values fluently
+Pdc.of(sword)
+    .set("item-id", "fire_sword")
+    .set("custom-damage", 15)
+    .set("multiplier", 1.5)
+    .set("unlocked", true)
+    .set("tags", List.of("legendary", "fire"));
+
+// Read values (returns null/defaultValue if the key doesn't exist)
+String itemId = Pdc.of(sword).get("item-id");
+int customDamage = Pdc.of(sword).getOrDefault("custom-damage", 0);
+double multiplier = Pdc.of(sword).getOrDefault("multiplier", 1.0);
+boolean unlocked = Pdc.of(sword).getOrDefault("unlocked", false);
+List<String> tags = Pdc.of(sword).getList("tags");
 ```
+
+### Namespaced PDC Contexts
+You can scope keys under a specific namespace (e.g. your plugin name) to avoid conflicts:
+```java
+// Writes to namespaced keys: "myplugin:cooldown" and "myplugin:uses"
+Pdc.of(sword).namespaced("myplugin")
+    .set("cooldown", 10)
+    .set("uses", 5);
+
+int cooldown = Pdc.of(sword).namespaced("myplugin").getOrDefault("cooldown", 0);
+```
+
+### PDC Change Listeners
+You can register global listeners to execute logic whenever specific metadata changes on a player, block, or item:
+```java
+import org.bukkit.NamespacedKey;
+
+NamespacedKey key = new NamespacedKey("myplugin", "coins");
+
+Pdc.registerListener(key, (holder, k, oldValue, newValue) -> {
+    if (holder instanceof Player player) {
+        player.sendMessage("Your coins updated from " + oldValue + " to " + newValue + "!");
+    }
+});
+```
+
+> [!WARNING]
+> Legacy static methods like `Pdc.get(item, key)` or `Pdc.getInt(...)` are deprecated and scheduled for removal in `v1.0.6`. Please migrate to the fluent `Pdc.of(...)` API.
 
 ---
 
@@ -126,7 +142,7 @@ Entity entity = Players.getTargetEntity(player, 50);
 Kyori's native BossBar API is powerful but requires manual scheduler tracking to clean up. OumLib makes creating self-expiring bossbars easy on both Paper and Velocity:
 
 > [!NOTE]
-> The old utility class `dev.oum.oumlib.util.BossBars` is deprecated since `v1.0.1` and marked for removal in `v1.0.3`. Please use `Text.bossBar` or `Text.bossBarTemporary` instead.
+> The old utility class `dev.oum.oumlib.util.BossBars` is deprecated since `v1.0.1` and marked for removal in `v1.0.9`. Please use `Text.bossBar` or `Text.bossBarTemporary` instead.
 
 ```java
 import dev.oum.oumlib.text.Text;
@@ -208,22 +224,23 @@ if (speedCooldown.isOnCooldown(player.getUniqueId())) {
 
 ## 8. PlayerData Persistence (Paper-only)
 
-A simple helper wrapper for player PersistentDataContainers, making read/write operations for player-bound data easy and clean.
+> [!WARNING]
+> The `dev.oum.oumlib.util.PlayerData` helper wrapper is deprecated in `v1.0.1` and scheduled for removal in `v1.0.3`. Developers must migrate to the modern and unified `Pdc.of(player)` API.
 
+### Migration Example:
 ```java
-import dev.oum.oumlib.util.PlayerData;
+import dev.oum.oumlib.util.Pdc;
 
-PlayerData data = PlayerData.of(player);
-
-// Set player-bound persistent values
-data.set("rank", "MVP");
-data.setInt("coins", 500);
-data.setBoolean("claimed-reward", true);
+// Set player-bound persistent values using Pdc.of
+Pdc.of(player)
+    .set("rank", "MVP")
+    .set("coins", 500)
+    .set("claimed-reward", true);
 
 // Get values
-String rank = data.getOrDefault("rank", "Default");
-int coins = data.getIntOrDefault("coins", 0);
-boolean claimed = data.getBooleanOrDefault("claimed-reward", false);
+String rank = Pdc.of(player).getOrDefault("rank", "Default");
+int coins = Pdc.of(player).getOrDefault("coins", 0);
+boolean claimed = Pdc.of(player).getOrDefault("claimed-reward", false);
 ```
 
 ---

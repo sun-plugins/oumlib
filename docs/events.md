@@ -23,9 +23,25 @@ Events.listen(PlayerInteractEvent.class)
     });
 ```
 
+### Player-Specific Filtering (Paper-only)
+If you need to listen for events triggered specifically by a particular player (e.g. during a minigame, a chat prompt session, or an active GUI menu context), use `BukkitEvents.listenFor(Player, Class)`:
+
+```java
+import dev.oum.oumlib.event.BukkitEvents;
+import org.bukkit.event.player.PlayerInteractEvent;
+
+Player targetPlayer = ...;
+
+BukkitEvents.listenFor(targetPlayer, PlayerInteractEvent.class)
+    .handler(event -> {
+        // This handler will only execute if event.getPlayer() matches the targetPlayer
+        event.getPlayer().sendMessage("You interacted!");
+    });
+```
+
 ---
 
-## 2. Cancellable Events & State Handling
+## 3. Cancellable Events & State Handling
 
 You can configure how the event listener behaves regarding cancelled events:
 - **`ignoreCancelled()`**: The listener will skip execution if another plugin has already cancelled the event.
@@ -43,7 +59,7 @@ Events.listen(BlockBreakEvent.class)
 
 ---
 
-## 3. Automatic Unregistration & Memory Protection
+## 4. Automatic Unregistration & Memory Protection
 
 To avoid memory leaks, you can configure listeners to unregister themselves automatically when certain thresholds are reached:
 - **`maxFires(int count)`**: Automatically cleans up and unregisters the listener after it executes a set number of times.
@@ -63,7 +79,7 @@ Events.listen(PlayerQuitEvent.class)
 
 ---
 
-## 4. Thread Safety & Folia Compatibility
+## 5. Thread Safety & Folia Compatibility
 
 - **Paper/Spigot**: Event handlers run synchronously on the server's main tick thread (the standard Bukkit behavior), unless the event itself is marked as asynchronous (e.g. `AsyncChatEvent`).
 - **Velocity**: Event handlers are run asynchronously on Netty thread pools. Velocity events do not run on a single main thread.

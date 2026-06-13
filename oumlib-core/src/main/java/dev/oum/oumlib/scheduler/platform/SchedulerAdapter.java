@@ -14,8 +14,14 @@ public interface SchedulerAdapter {
     @Contract("_, _ -> new")
     @NonNull TaskHandle runLater(Duration delay, Runnable task);
 
+    @Contract("_, _ -> new")
+    @NonNull TaskHandle runLater(long ticks, Runnable task);
+
     @Contract("_, _, _ -> new")
     @NonNull TaskHandle runRepeating(Duration initialDelay, Duration interval, Runnable task);
+
+    @Contract("_, _, _ -> new")
+    @NonNull TaskHandle runRepeating(long initialTicks, long periodTicks, Runnable task);
 
     @Contract("_ -> new")
     @NonNull TaskHandle runAsync(Runnable task);

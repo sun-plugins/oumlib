@@ -142,15 +142,30 @@ db.executeScript(initScript)
 
 ## 7. Advanced Integration (Row Mapping & Resource Loading)
 
-### Mapping Rows to Records or Objects (`RowMapper`)
-Instead of working with raw maps, you can map each row of a `ResultSet` to a Java Record or POJO using a custom `RowMapper`:
+### Automatic Class & Record Mapping
+Instead of mapping database fields manually, you can pass a Java `Record` or custom class directly. OumLib will automatically inspect constructor parameters or class fields and map the query result rows directly:
+
+```java
+public record PlayerCoins(String uuid, int coins) {}
+
+// Auto-maps fields in the result set to the record constructor
+db.executeQuery("SELECT uuid, coins FROM players", PlayerCoins.class)
+    .thenAcceptSync(profiles -> {
+        for (PlayerCoins profile : profiles) {
+            getLogger().info(profile.uuid() + " has " + profile.coins() + " coins!");
+        }
+    });
+```
+
+### Manual Mapping with `RowMapper`
+If you need custom mapping behavior (such as custom data type conversions or composite objects), implement a custom `RowMapper`:
 
 ```java
 import dev.oum.oumlib.database.RowMapper;
 
 public record PlayerCoins(String uuid, int coins) {}
 
-// Executing and mapping the result set
+// Executing and mapping the result set manually
 db.executeQuery("SELECT uuid, coins FROM players", rs -> new PlayerCoins(
     rs.getString("uuid"),
     rs.getInt("coins")

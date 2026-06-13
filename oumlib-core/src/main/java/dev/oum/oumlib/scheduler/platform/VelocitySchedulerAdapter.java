@@ -46,14 +46,26 @@ public final class VelocitySchedulerAdapter implements SchedulerAdapter {
         return new TaskHandle(scheduled::cancel, () -> scheduled.status() == TaskStatus.CANCELLED);
     }
 
+    @Contract("_, _ -> new")
+    @Override
+    public @NonNull TaskHandle runLater(long ticks, Runnable task) {
+        return runLater(Duration.ofMillis(ticks * 50L), task);
+    }
+
     @Contract("_, _, _ -> new")
     @Override
-    public @NonNull TaskHandle runRepeating(@NonNull Duration initialDelay, Duration interval, Runnable task) {
+    public @NonNull TaskHandle runRepeating(@NonNull Duration initialDelay, @NonNull Duration interval, Runnable task) {
         var scheduled = scheduler.buildTask(plugin, task)
                 .delay(initialDelay.toMillis(), TimeUnit.MILLISECONDS)
                 .repeat(interval.toMillis(), TimeUnit.MILLISECONDS)
                 .schedule();
         return new TaskHandle(scheduled::cancel, () -> scheduled.status() == TaskStatus.CANCELLED);
+    }
+
+    @Contract("_, _, _ -> new")
+    @Override
+    public @NonNull TaskHandle runRepeating(long initialTicks, long periodTicks, Runnable task) {
+        return runRepeating(Duration.ofMillis(initialTicks * 50L), Duration.ofMillis(periodTicks * 50L), task);
     }
 
     @Contract("_ -> new")

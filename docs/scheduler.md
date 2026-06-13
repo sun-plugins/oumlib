@@ -27,7 +27,11 @@ Scheduler.runAsync(() -> {
 For operations that must interact with Bukkit/Paper API directly (like spawning entities or modifying blocks), you must run on the server's main thread:
 
 - **`Scheduler.run(Runnable)`**: Schedules a task to execute on the next tick of the server's main thread.
-- **`Scheduler.runDelayed(Duration, Runnable)`** / **`Scheduler.runLater(Duration, Runnable)`**: Schedules a task to execute after a specified delay on the server's main thread.
+- **`Scheduler.runLater(Duration, Runnable)`**: Schedules a task to execute after a specified delay on the server's main thread.
+- **`Scheduler.runLater(long ticks, Runnable)`**: Schedules a task to execute after a specified amount of server ticks.
+
+> [!WARNING]
+> The method `Scheduler.runDelayed(...)` is deprecated in `v1.0.1` and scheduled for removal in `v1.0.9`. Developers must migrate to `Scheduler.runLater(...)`.
 
 ```java
 import dev.oum.oumlib.scheduler.Scheduler;
@@ -35,9 +39,14 @@ import org.bukkit.Bukkit;
 import java.time.Duration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
-Scheduler.runDelayed(Duration.ofSeconds(2), () -> {
-    // Bukkit API calls must be run on the sync thread
+// Run tasks later using durations
+Scheduler.runLater(Duration.ofSeconds(2), () -> {
     Bukkit.broadcast(MiniMessage.miniMessage().deserialize("<green>2 seconds elapsed!</green>"));
+});
+
+// Or using ticks (e.g. 20 ticks = 1 second)
+Scheduler.runLater(20L, () -> {
+    Bukkit.broadcast(MiniMessage.miniMessage().deserialize("<green>1 second elapsed!</green>"));
 });
 ```
 
@@ -113,4 +122,35 @@ Scheduler.supplyVirtual(() -> database.loadUserCoins(uuid))
     .thenAcceptSync(coins -> {
         player.sendMessage("Loaded " + coins + " coins via Virtual Threads!");
     });
+```
+
+---
+
+## 6. TaskChains (Sequential execution control)
+
+`TaskChain` allows developers to build a sequence of tasks that execute step-by-step, shifting back and forth between synchronous and asynchronous threads with custom delays.
+
+```java
+import dev.oum.oumlib.scheduler.TaskChain;
+import java.time.Duration;
+
+TaskChain.create("Initial Value")
+    // Step 1: Run asynchronously (e.g., fetch from DB or Web API)
+    .async(value -> {
+        return value + " -> Async Step";
+    })
+    // Step 2: Delay for 2 seconds
+    .delay(Duration.ofSeconds(2))
+    // Step 3: Run on the main sync server thread
+    .sync(value -> {
+        player.sendMessage("Current chain status: " + value);
+        return value + " -> Sync Step";
+    })
+    // Step 4: Delay for another 10 server ticks
+    .delay(10)
+    // Step 5: Finish asynchronously
+    .async(value -> {
+        System.out.println("Chain finished: " + value);
+    })
+    .execute();
 ```

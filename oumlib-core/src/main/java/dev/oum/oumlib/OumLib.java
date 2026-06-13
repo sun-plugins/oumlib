@@ -1,9 +1,14 @@
 package dev.oum.oumlib;
 
+import com.velocitypowered.api.event.Subscribe;
+import com.velocitypowered.api.event.connection.PluginMessageEvent;
 import com.velocitypowered.api.proxy.ProxyServer;
+import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
+import dev.oum.oumlib.command.Argument;
 import dev.oum.oumlib.event.EventBus;
 import dev.oum.oumlib.event.platform.PaperEventBus;
 import dev.oum.oumlib.event.platform.VelocityEventBus;
+import dev.oum.oumlib.inventory.MenuRegistry;
 import dev.oum.oumlib.scheduler.Scheduler;
 import dev.oum.oumlib.scheduler.platform.BukkitSchedulerAdapter;
 import dev.oum.oumlib.scheduler.platform.VelocitySchedulerAdapter;
@@ -13,11 +18,22 @@ import dev.oum.oumlib.text.placeholder.PlaceholderRegistry;
 import dev.oum.oumlib.text.placeholder.bridge.MiniPlaceholdersHelper;
 import dev.oum.oumlib.text.placeholder.bridge.PapiHelper;
 import net.kyori.adventure.audience.Audience;
+import org.bukkit.Bukkit;
+import org.bukkit.World;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -30,6 +46,7 @@ public final class OumLib {
     private static PresetRegistry presetRegistry;
     private static PlaceholderRegistry placeholderRegistry;
     private static boolean initialized;
+    private static boolean debugMode = false;
 
     private OumLib() {
     }
@@ -46,6 +63,11 @@ public final class OumLib {
 
         BukkitSchedulerAdapter.initialize(p);
         Scheduler.initialize(BukkitSchedulerAdapter.get());
+
+        p.getServer().getMessenger().registerIncomingPluginChannel(p, "oumlib:autocomplete", (channel, player, message) -> {
+            handleSpigotAutocompleteMessage(player, message);
+        });
+        p.getServer().getMessenger().registerOutgoingPluginChannel(p, "oumlib:autocomplete");
 
         detectIntegrations(p);
         initialized = true;
@@ -66,9 +88,64 @@ public final class OumLib {
         VelocitySchedulerAdapter.initialize(server, pluginInstance);
         Scheduler.initialize(VelocitySchedulerAdapter.get());
 
+        server.getChannelRegistrar().register(MinecraftChannelIdentifier.from("oumlib:autocomplete"));
+        server.getEventManager().register(pluginInstance, new Object() {
+            @Subscribe
+            public void onPluginMessage(PluginMessageEvent event) {
+                if (event.getIdentifier().getId().equals("oumlib:autocomplete")) {
+                    event.setResult(PluginMessageEvent.ForwardResult.handled());
+                    try {
+                        DataInputStream dis = new DataInputStream(new ByteArrayInputStream(event.getData()));
+                        String uuidStr = dis.readUTF();
+                        int size = dis.readInt();
+                        List<String> suggestions = new ArrayList<>(size);
+                        for (int i = 0; i < size; i++) {
+                            suggestions.add(dis.readUTF());
+                        }
+                        Argument.handleVelocityPluginMessage(UUID.fromString(uuidStr), suggestions);
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+        });
+
         detectVelocityIntegrations(server);
         initialized = true;
         return new InitBuilder();
+    }
+
+    private static void handleSpigotAutocompleteMessage(Player player, byte[] message) {
+        try {
+            DataInputStream dis = new DataInputStream(new ByteArrayInputStream(message));
+            String uuidStr = dis.readUTF();
+            String queryType = dis.readUTF();
+            String remaining = dis.readUTF();
+
+            List<String> suggestions = new ArrayList<>();
+            if (queryType.equalsIgnoreCase("worlds")) {
+                for (World w : Bukkit.getWorlds()) {
+                    if (w.getName().toLowerCase(Locale.ROOT).startsWith(remaining.toLowerCase(Locale.ROOT))) {
+                        suggestions.add(w.getName());
+                    }
+                }
+            } else if (queryType.equalsIgnoreCase("players")) {
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    if (p.getName().toLowerCase(Locale.ROOT).startsWith(remaining.toLowerCase(Locale.ROOT))) {
+                        suggestions.add(p.getName());
+                    }
+                }
+            }
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            DataOutputStream dos = new DataOutputStream(baos);
+            dos.writeUTF(uuidStr);
+            dos.writeInt(suggestions.size());
+            for (String s : suggestions) {
+                dos.writeUTF(s);
+            }
+            player.sendPluginMessage(plugin, "oumlib:autocomplete", baos.toByteArray());
+        } catch (Exception ignored) {
+        }
     }
 
     private static void detectIntegrations(@NonNull Plugin p) {
@@ -88,6 +165,11 @@ public final class OumLib {
 
     public static void shutdown() {
         Scheduler.shutdownAll();
+        MenuRegistry.shutdown();
+    }
+
+    public static @NonNull Logger logger() {
+        return Logger.getLogger("OumLib");
     }
 
     public static Plugin plugin() {
@@ -121,6 +203,30 @@ public final class OumLib {
         }
     }
 
+    public static boolean isDebug() {
+        return debugMode;
+    }
+
+    public static void setDebug(boolean enabled) {
+        debugMode = enabled;
+    }
+
+    public static void logInfo(String message) {
+        if (plugin != null) {
+            plugin.getSLF4JLogger().info(message);
+        } else {
+            Logger.getLogger("OumLib").log(Level.INFO, message);
+        }
+    }
+
+    public static void logWarning(String message) {
+        if (plugin != null) {
+            plugin.getSLF4JLogger().warn(message);
+        } else {
+            Logger.getLogger("OumLib").log(Level.WARNING, message);
+        }
+    }
+
     public static void logError(String message) {
         if (plugin != null) {
             plugin.getSLF4JLogger().error(message);
@@ -134,6 +240,15 @@ public final class OumLib {
             plugin.getSLF4JLogger().error(message, t);
         } else {
             Logger.getLogger("OumLib").log(Level.SEVERE, message, t);
+        }
+    }
+
+    public static void logDebug(String message) {
+        if (!debugMode) return;
+        if (plugin != null) {
+            plugin.getSLF4JLogger().debug(message);
+        } else {
+            Logger.getLogger("OumLib").log(Level.INFO, "[DEBUG] " + message);
         }
     }
 

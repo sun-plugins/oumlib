@@ -11,6 +11,7 @@ import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 
 public final class Arguments {
@@ -71,6 +72,70 @@ public final class Arguments {
     }
 
     @Contract("_ -> new")
+    public static @NonNull Argument<?> finePosition(String name) {
+        try {
+            Class.forName("io.papermc.paper.command.brigadier.argument.ArgumentTypes");
+            return (Argument<?>) Class.forName("dev.oum.oumlib.command.platform.PaperCommandHelper")
+                    .getDeclaredMethod("createFinePositionArgument", String.class)
+                    .invoke(null, name);
+        } catch (Exception ignored) {
+        }
+        throw new UnsupportedOperationException("Fine position argument is only supported on Paper.");
+    }
+
+    @Contract("_ -> new")
+    public static @NonNull Argument<?> blockPosition(String name) {
+        try {
+            Class.forName("io.papermc.paper.command.brigadier.argument.ArgumentTypes");
+            return (Argument<?>) Class.forName("dev.oum.oumlib.command.platform.PaperCommandHelper")
+                    .getDeclaredMethod("createBlockPositionArgument", String.class)
+                    .invoke(null, name);
+        } catch (Exception ignored) {
+        }
+        throw new UnsupportedOperationException("Block position argument is only supported on Paper.");
+    }
+
+    @Contract("_ -> new")
+    public static @NonNull Argument<?> players(String name) {
+        try {
+            Class.forName("io.papermc.paper.command.brigadier.argument.ArgumentTypes");
+            return (Argument<?>) Class.forName("dev.oum.oumlib.command.platform.PaperCommandHelper")
+                    .getDeclaredMethod("createPlayersArgument", String.class)
+                    .invoke(null, name);
+        } catch (Exception ignored) {
+        }
+        return new Argument<>(name, StringArgumentType.word(), (raw, ctx) -> {
+            String nameStr = (String) raw;
+            var player = OumLib.proxy().getPlayer(nameStr).orElse(null);
+            return player != null ? List.of(player) : List.of();
+        });
+    }
+
+    @Contract("_ -> new")
+    public static @NonNull Argument<?> world(String name) {
+        try {
+            Class.forName("io.papermc.paper.command.brigadier.argument.ArgumentTypes");
+            return (Argument<?>) Class.forName("dev.oum.oumlib.command.platform.PaperCommandHelper")
+                    .getDeclaredMethod("createWorldArgument", String.class)
+                    .invoke(null, name);
+        } catch (Exception ignored) {
+        }
+        throw new UnsupportedOperationException("World argument is only supported on Paper.");
+    }
+
+    @Contract("_ -> new")
+    public static @NonNull Argument<?> key(String name) {
+        try {
+            Class.forName("io.papermc.paper.command.brigadier.argument.ArgumentTypes");
+            return (Argument<?>) Class.forName("dev.oum.oumlib.command.platform.PaperCommandHelper")
+                    .getDeclaredMethod("createKeyArgument", String.class)
+                    .invoke(null, name);
+        } catch (Exception ignored) {
+        }
+        throw new UnsupportedOperationException("Key/NamespacedKey argument is only supported on Paper.");
+    }
+
+    @Contract("_ -> new")
     public static @NonNull Argument<Material> material(String name) {
         return new Argument<>(name, StringArgumentType.word(), (raw, ctx) -> {
             try {
@@ -99,7 +164,7 @@ public final class Arguments {
     }
 
     @Deprecated(since = "1.0.1", forRemoval = true)
-    public static Duration parseDuration(@NonNull String input) {
+    public static @NonNull Duration parseDuration(@NonNull String input) {
         return Format.parseDuration(input);
     }
 }

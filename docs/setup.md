@@ -24,8 +24,9 @@ public final class PaperExamplePlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         // Initialize OumLib for Paper.
-        // This registers command builders, listeners, and integration bridges.
-        OumLib.init(this);
+        // OumLib.init returns an InitBuilder for method chaining configuration.
+        OumLib.init(this)
+            .build();
     }
 
     @Override
@@ -35,6 +36,20 @@ public final class PaperExamplePlugin extends JavaPlugin {
         OumLib.shutdown();
     }
 }
+```
+
+### The InitBuilder
+When calling `OumLib.init()`, it returns an `InitBuilder` which allows fluent configuration of library-wide features:
+- `.preset(Preset type, String prefix)`: Customizes formatting prefixes for global text presets.
+- `.build()`: Completes initialization.
+
+Example:
+```java
+OumLib.init(this)
+    .preset(Preset.INFO, "<gray>[Info]</gray> ")
+    .preset(Preset.SUCCESS, "<green>[Success]</green> ")
+    .preset(Preset.ERROR, "<red>[Error]</red> ")
+    .build();
 ```
 
 ---
@@ -67,7 +82,8 @@ public final class VelocityExamplePlugin {
     @Subscribe
     public void onProxyInitialization(ProxyInitializeEvent event) {
         // Initialize OumLib for Velocity.
-        OumLib.init(server, this);
+        OumLib.init(server, this)
+            .build();
     }
 
     @Subscribe

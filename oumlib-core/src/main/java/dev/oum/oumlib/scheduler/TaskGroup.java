@@ -27,8 +27,20 @@ public final class TaskGroup {
         return handle;
     }
 
+    public @NonNull TaskHandle runLater(long ticks, Runnable task) {
+        TaskHandle handle = Scheduler.runLater(ticks, task);
+        handles.add(handle);
+        return handle;
+    }
+
     public @NonNull TaskHandle runRepeating(Duration initialDelay, Duration interval, Runnable task) {
         TaskHandle handle = Scheduler.runRepeating(initialDelay, interval, task);
+        handles.add(handle);
+        return handle;
+    }
+
+    public @NonNull TaskHandle runRepeating(long initialTicks, long periodTicks, Runnable task) {
+        TaskHandle handle = Scheduler.runRepeating(initialTicks, periodTicks, task);
         handles.add(handle);
         return handle;
     }

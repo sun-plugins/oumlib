@@ -3,6 +3,8 @@ package dev.oum.oumlib.util;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.util.Vector;
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -11,6 +13,7 @@ public final class Locations {
     private Locations() {
     }
 
+    @Contract(pure = true)
     public static @NonNull String serialize(@NonNull Location loc) {
         return (loc.getWorld() != null ? loc.getWorld().getName() : "world") + "," +
                 loc.getX() + "," +
@@ -20,6 +23,7 @@ public final class Locations {
                 loc.getPitch();
     }
 
+    @Contract(pure = true)
     public static @NonNull String serializeBlock(@NonNull Location loc) {
         return (loc.getWorld() != null ? loc.getWorld().getName() : "world") + "," +
                 loc.getBlockX() + "," +
@@ -27,6 +31,7 @@ public final class Locations {
                 loc.getBlockZ();
     }
 
+    @Contract(pure = true)
     public static @Nullable Location deserialize(@NonNull String str) {
         String[] parts = str.split(",");
         if (parts.length < 4) return null;
@@ -46,7 +51,27 @@ public final class Locations {
         }
     }
 
+    @Contract(pure = true)
     public static @NonNull String serializeRegion(@NonNull Location loc) {
         return serialize(loc) + "," + (loc.getBlockX() >> 4) + "," + (loc.getBlockZ() >> 4);
+    }
+
+    @Contract(pure = true)
+    public static @NonNull String serializeVector(@NonNull Vector vector) {
+        return vector.getX() + "," + vector.getY() + "," + vector.getZ();
+    }
+
+    @Contract(pure = true)
+    public static @Nullable Vector deserializeVector(@NonNull String str) {
+        String[] parts = str.split(",");
+        if (parts.length < 3) return null;
+        try {
+            double x = Double.parseDouble(parts[0]);
+            double y = Double.parseDouble(parts[1]);
+            double z = Double.parseDouble(parts[2]);
+            return new Vector(x, y, z);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

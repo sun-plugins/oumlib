@@ -1,27 +1,20 @@
 package dev.oum.oumlib.util;
 
-import com.google.gson.Gson;
-import dev.oum.oumlib.OumLib;
-import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
-import org.bukkit.persistence.PersistentDataContainer;
-import org.bukkit.persistence.PersistentDataType;
-import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Arrays;
 import java.util.List;
 
+@Deprecated(since = "1.0.4", forRemoval = true)
 public final class PlayerData {
 
-    private static final Gson GSON = new Gson();
     private final Player player;
-    private final PersistentDataContainer pdc;
+    private final Pdc.PdcHolder holder;
 
     private PlayerData(@NonNull Player player) {
         this.player = player;
-        this.pdc = player.getPersistentDataContainer();
+        this.holder = Pdc.of(player);
     }
 
     public static @NonNull PlayerData of(@NonNull Player player) {
@@ -32,101 +25,79 @@ public final class PlayerData {
         return player;
     }
 
-    @Contract("_ -> new")
-    private @NonNull NamespacedKey key(String key) {
-        return new NamespacedKey(OumLib.plugin(), key);
-    }
-
     public void set(@NonNull String key, @Nullable String value) {
-        if (value == null) {
-            pdc.remove(key(key));
-        } else {
-            pdc.set(key(key), PersistentDataType.STRING, value);
-        }
+        holder.set(key, value);
     }
 
     public @Nullable String get(@NonNull String key) {
-        return pdc.get(key(key), PersistentDataType.STRING);
+        return holder.get(key);
     }
 
-    public String getOrDefault(@NonNull String key, @NonNull String def) {
-        String val = get(key);
-        return val != null ? val : def;
+    public @NonNull String getOrDefault(@NonNull String key, @NonNull String def) {
+        return holder.getOrDefault(key, def);
     }
 
     public void setInt(@NonNull String key, int value) {
-        pdc.set(key(key), PersistentDataType.INTEGER, value);
+        holder.setInt(key, value);
     }
 
     public @Nullable Integer getInt(@NonNull String key) {
-        return pdc.get(key(key), PersistentDataType.INTEGER);
+        return holder.getInt(key);
     }
 
     public int getIntOrDefault(@NonNull String key, int def) {
-        Integer val = getInt(key);
-        return val != null ? val : def;
+        return holder.getIntOrDefault(key, def);
     }
 
     public void setDouble(@NonNull String key, double value) {
-        pdc.set(key(key), PersistentDataType.DOUBLE, value);
+        holder.setDouble(key, value);
     }
 
     public @Nullable Double getDouble(@NonNull String key) {
-        return pdc.get(key(key), PersistentDataType.DOUBLE);
+        return holder.getDouble(key);
     }
 
     public double getDoubleOrDefault(@NonNull String key, double def) {
-        Double val = getDouble(key);
-        return val != null ? val : def;
+        return holder.getDoubleOrDefault(key, def);
     }
 
     public void setBoolean(@NonNull String key, boolean value) {
-        pdc.set(key(key), PersistentDataType.BYTE, (byte) (value ? 1 : 0));
+        holder.setBoolean(key, value);
     }
 
     public boolean getBoolean(@NonNull String key) {
-        Byte b = pdc.get(key(key), PersistentDataType.BYTE);
-        return b != null && b != 0;
+        return holder.getBoolean(key);
     }
 
     public boolean getBooleanOrDefault(@NonNull String key, boolean def) {
-        Byte b = pdc.get(key(key), PersistentDataType.BYTE);
-        return b != null ? b != 0 : def;
+        return holder.getBooleanOrDefault(key, def);
     }
 
     public void setLong(@NonNull String key, long value) {
-        pdc.set(key(key), PersistentDataType.LONG, value);
+        holder.setLong(key, value);
     }
 
     public @Nullable Long getLong(@NonNull String key) {
-        return pdc.get(key(key), PersistentDataType.LONG);
+        return holder.getLong(key);
     }
 
     public long getLongOrDefault(@NonNull String key, long def) {
-        Long val = getLong(key);
-        return val != null ? val : def;
+        return holder.getLongOrDefault(key, def);
     }
 
     public void setList(@NonNull String key, @Nullable List<String> value) {
-        if (value == null) {
-            pdc.remove(key(key));
-        } else {
-            pdc.set(key(key), PersistentDataType.STRING, GSON.toJson(value));
-        }
+        holder.setList(key, value);
     }
 
     public @Nullable List<String> getList(@NonNull String key) {
-        String raw = pdc.get(key(key), PersistentDataType.STRING);
-        if (raw == null) return null;
-        if (raw.isEmpty()) return List.of();
-        return Arrays.asList(GSON.fromJson(raw, String[].class));
+        return holder.getList(key);
     }
 
     public void remove(@NonNull String key) {
-        pdc.remove(key(key));
+        holder.remove(key);
     }
 
     public boolean has(@NonNull String key) {
-        return pdc.has(key(key));
+        return holder.has(key);
     }
 }

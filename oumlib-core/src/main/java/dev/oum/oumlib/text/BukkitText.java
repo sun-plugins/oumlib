@@ -2,6 +2,7 @@ package dev.oum.oumlib.text;
 
 import org.bukkit.Bukkit;
 
+@Deprecated(forRemoval = true, since = "1.0.4")
 public final class BukkitText {
 
     private BukkitText() {

@@ -10,6 +10,7 @@ import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.title.Title;
+import org.jetbrains.annotations.CheckReturnValue;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 
@@ -86,7 +87,8 @@ public final class Text {
     }
 
     @Contract(value = "_ -> new", pure = true)
-    public static @NonNull TextBuilder builder(String message) {
+    @CheckReturnValue
+    public static @NonNull TextBuilder builder(@NonNull String message) {
         return new TextBuilder(message);
     }
 

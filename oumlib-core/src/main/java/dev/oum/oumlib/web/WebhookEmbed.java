@@ -1,11 +1,11 @@
 package dev.oum.oumlib.web;
 
+import org.jetbrains.annotations.CheckReturnValue;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public final class WebhookEmbed {
@@ -33,6 +33,11 @@ public final class WebhookEmbed {
         this.authorName = builder.authorName;
         this.authorUrl = builder.authorUrl;
         this.authorIcon = builder.authorIcon;
+    }
+
+    @CheckReturnValue
+    public static @NonNull Builder builder() {
+        return new Builder();
     }
 
     public @Nullable String title() {
@@ -75,15 +80,11 @@ public final class WebhookEmbed {
         return authorIcon;
     }
 
-    public static @NonNull Builder builder() {
-        return new Builder();
-    }
-
     public static final class Builder {
+        private final List<WebhookEmbedField> fields = new ArrayList<>();
         private String title;
         private String description;
         private Integer color;
-        private final List<WebhookEmbedField> fields = new ArrayList<>();
         private String footerText;
         private String footerIcon;
         private String thumbnailUrl;
@@ -94,37 +95,44 @@ public final class WebhookEmbed {
         private Builder() {
         }
 
+        @CheckReturnValue
         public @NonNull Builder title(@Nullable String title) {
             this.title = title;
             return this;
         }
 
+        @CheckReturnValue
         public @NonNull Builder description(@Nullable String description) {
             this.description = description;
             return this;
         }
 
+        @CheckReturnValue
         public @NonNull Builder color(@Nullable Integer color) {
             this.color = color;
             return this;
         }
 
+        @CheckReturnValue
         public @NonNull Builder field(@NonNull String name, @NonNull String value, boolean inline) {
             this.fields.add(new WebhookEmbedField(name, value, inline));
             return this;
         }
 
+        @CheckReturnValue
         public @NonNull Builder footer(@Nullable String text, @Nullable String iconUrl) {
             this.footerText = text;
             this.footerIcon = iconUrl;
             return this;
         }
 
+        @CheckReturnValue
         public @NonNull Builder thumbnail(@Nullable String url) {
             this.thumbnailUrl = url;
             return this;
         }
 
+        @CheckReturnValue
         public @NonNull Builder author(@Nullable String name, @Nullable String url, @Nullable String iconUrl) {
             this.authorName = name;
             this.authorUrl = url;
@@ -132,6 +140,7 @@ public final class WebhookEmbed {
             return this;
         }
 
+        @Contract(" -> new")
         public @NonNull WebhookEmbed build() {
             return new WebhookEmbed(this);
         }

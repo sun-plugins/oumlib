@@ -114,9 +114,16 @@ public final class PaperCommandRegistrar implements CommandRegistrar {
             @NonNull CommandBuilder builder
     ) {
         var sender = source.getSender();
+        CommandContext context = new CommandContext(source, sender, builder.label(), map);
         if (builder.cooldown() != null && sender instanceof Player player) {
-            String bypassPerm = (builder.permission() != null ? builder.permission() : builder.label()) + ".bypass";
-            if (!player.hasPermission(bypassPerm) && builder.cooldown().isOnCooldown(player.getUniqueId())) {
+            boolean bypassed;
+            if (builder.cooldownBypass() != null) {
+                bypassed = builder.cooldownBypass().test(context);
+            } else {
+                String bypassPerm = (builder.permission() != null ? builder.permission() : builder.label()) + ".bypass";
+                bypassed = player.hasPermission(bypassPerm);
+            }
+            if (!bypassed && builder.cooldown().isOnCooldown(player.getUniqueId())) {
                 long remaining = builder.cooldown().remainingSeconds(player.getUniqueId());
                 player.sendMessage(MiniMessage.miniMessage()
                         .deserialize(builder.cooldownMessage().replace("<remaining>", String.valueOf(remaining))));
@@ -124,6 +131,6 @@ public final class PaperCommandRegistrar implements CommandRegistrar {
             }
             builder.cooldown().set(player.getUniqueId());
         }
-        exec.accept(new CommandContext(source, sender, builder.label(), map));
+        exec.accept(context);
     }
 }

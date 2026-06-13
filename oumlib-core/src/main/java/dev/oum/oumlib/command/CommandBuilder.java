@@ -3,13 +3,16 @@ package dev.oum.oumlib.command;
 import dev.oum.oumlib.OumLib;
 import dev.oum.oumlib.util.Cooldown;
 import dev.oum.oumlib.util.Permission;
+import org.jetbrains.annotations.CheckReturnValue;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 public final class CommandBuilder {
 
@@ -23,66 +26,79 @@ public final class CommandBuilder {
     private String cooldownMessage = "<red>Wait <remaining>s before using this again.";
     private Consumer<CommandContext> executor;
     private Cooldown cooldown;
+    private Predicate<CommandContext> cooldownBypass;
 
     private CommandBuilder(String label) {
         this.label = label;
     }
 
     @Contract("_ -> new")
-    public static @NonNull CommandBuilder create(String label) {
+    @CheckReturnValue
+    public static @NonNull CommandBuilder create(@NonNull String label) {
         return new CommandBuilder(label);
     }
 
     @Contract("_ -> new")
-    public static @NonNull CommandBuilder literal(String label) {
+    @CheckReturnValue
+    public static @NonNull CommandBuilder literal(@NonNull String label) {
         return new CommandBuilder(label);
     }
 
-    public CommandBuilder description(String description) {
+    @CheckReturnValue
+    public @NonNull CommandBuilder description(@NonNull String description) {
         this.description = description;
         return this;
     }
 
-    public CommandBuilder permission(String permission) {
+    @CheckReturnValue
+    public @NonNull CommandBuilder permission(@NonNull String permission) {
         this.permission = permission;
         return this;
     }
 
-    public CommandBuilder permission(Permission permission) {
+    @Contract(value = "_ -> this", mutates = "this")
+    @CheckReturnValue
+    public @NonNull CommandBuilder permission(@NonNull Permission permission) {
         this.permissionObject = permission;
         this.permission = permission.name();
         return this;
     }
 
-    public CommandBuilder aliases(String... a) {
+    @CheckReturnValue
+    public @NonNull CommandBuilder aliases(String @NonNull ... a) {
         aliases.addAll(List.of(a));
         return this;
     }
 
-    public CommandBuilder cooldown(Duration duration) {
+    @CheckReturnValue
+    public @NonNull CommandBuilder cooldown(@NonNull Duration duration) {
         this.cooldown = new Cooldown(duration);
         return this;
     }
 
-    public CommandBuilder cooldownMessage(String message) {
+    @CheckReturnValue
+    public @NonNull CommandBuilder cooldownMessage(@NonNull String message) {
         this.cooldownMessage = message;
         return this;
     }
 
-    public CommandBuilder argument(Argument<?> argument) {
+    @CheckReturnValue
+    public @NonNull CommandBuilder argument(@NonNull Argument<?> argument) {
         arguments.add(argument);
         return this;
     }
 
     @Contract("_ -> this")
-    public CommandBuilder subcommand(@NonNull Consumer<SubcommandBuilder> configurer) {
+    @CheckReturnValue
+    public @NonNull CommandBuilder subcommand(@NonNull Consumer<@NonNull SubcommandBuilder> configurer) {
         SubcommandBuilder sub = new SubcommandBuilder();
         configurer.accept(sub);
         subcommands.add(sub);
         return this;
     }
 
-    public CommandBuilder executes(Consumer<CommandContext> executor) {
+    @CheckReturnValue
+    public @NonNull CommandBuilder executes(@NonNull Consumer<@NonNull CommandContext> executor) {
         this.executor = executor;
         return this;
     }
@@ -103,43 +119,53 @@ public final class CommandBuilder {
         }
     }
 
-    public String label() {
+    public @NonNull String label() {
         return label;
     }
 
-    public String description() {
+    public @NonNull String description() {
         return description;
     }
 
-    public String permission() {
+    public @Nullable String permission() {
         return permission;
     }
 
-    public Permission permissionObject() {
+    public @Nullable Permission permissionObject() {
         return permissionObject;
     }
 
-    public String cooldownMessage() {
+    public @NonNull String cooldownMessage() {
         return cooldownMessage;
     }
 
-    public List<Argument<?>> arguments() {
+    public @NonNull List<@NonNull Argument<?>> arguments() {
         return arguments;
     }
 
-    public List<SubcommandBuilder> subcommands() {
+    public @NonNull List<@NonNull SubcommandBuilder> subcommands() {
         return subcommands;
     }
 
-    public Consumer<CommandContext> executor() {
+    public @Nullable Consumer<@NonNull CommandContext> executor() {
         return executor;
     }
 
-    public List<String> aliases() {
+    public @NonNull List<@NonNull String> aliases() {
         return aliases;
     }
 
-    public Cooldown cooldown() {
+    @CheckReturnValue
+    public @NonNull CommandBuilder cooldownBypass(@NonNull Predicate<@NonNull CommandContext> bypassPredicate) {
+        this.cooldownBypass = bypassPredicate;
+        return this;
+    }
+
+    public @Nullable Predicate<@NonNull CommandContext> cooldownBypass() {
+        return cooldownBypass;
+    }
+
+    public @Nullable Cooldown cooldown() {
         return cooldown;
     }
 }

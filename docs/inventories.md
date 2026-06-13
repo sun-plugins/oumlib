@@ -60,7 +60,42 @@ public class SettingsMenu {
 
 ---
 
-## 2. The ClickContext Object
+## 2. Menu State Management
+
+`ChestMenu` features built-in reactive state tracking. You can register state providers, embed state placeholders in the title, and update state values dynamically. OumLib handles title rendering, player-specific state scopes, and automated layout refreshes.
+
+```java
+import dev.oum.oumlib.inventory.ChestMenu;
+
+ChestMenu menu = ChestMenu.builder()
+    // Define a title containing a state placeholder
+    .title("<dark_gray>Level: {player_level}</dark_gray>")
+    .rows(3)
+    // Register initial state supplier
+    .state("player_level", player -> player.getLevel())
+    .pattern(
+        "#########",
+        "#   L   #",
+        "#########"
+    )
+    .bind('#', new ItemStack(Material.GRAY_STAINED_GLASS_PANE))
+    // Bind 'L' to level up item
+    .bind('L', () -> new ItemStack(Material.EXPERIENCE_BOTTLE))
+    .onClick('L', context -> {
+        // Update the state value dynamically
+        int currentLevel = (int) context.menu().getState(context.player(), "player_level");
+        context.player().setLevel(currentLevel + 1);
+        
+        // This updates the tracked state and automatically refreshes 
+        // the GUI layout and window title.
+        context.menu().updateState(context.player(), "player_level", currentLevel + 1);
+    })
+    .build();
+```
+
+---
+
+## 3. The ClickContext Object
 
 When a slot is clicked, the register handler receives a `ClickContext` containing:
 - **`context.player()`**: The player who clicked.
@@ -79,7 +114,7 @@ When a slot is clicked, the register handler receives a `ClickContext` containin
 
 ---
 
-## 3. Inventory Click Protection Guards
+## 4. Inventory Click Protection Guards
 
 To prevent standard menu bugs, OumLib implements two click protection safeguards internally:
 1. **Auto-Cancellation**: All clicks inside the menu container are cancelled (`event.setCancelled(true)`) to prevent players from taking items.
@@ -91,7 +126,7 @@ To prevent standard menu bugs, OumLib implements two click protection safeguards
 
 ---
 
-## 4. ItemBuilder Reference
+## 5. ItemBuilder Reference
 
 To make inventory item creations clean, OumLib includes a chainable `ItemBuilder` helper:
 
@@ -126,7 +161,7 @@ ItemStack copied = ItemBuilder.of(item1)
 
 ---
 
-## 5. AnvilMenu Reference
+## 6. AnvilMenu Reference
 
 `AnvilMenu` provides a simple way to prompt players for text input using Minecraft's anvil interface.
 
@@ -150,7 +185,7 @@ menu.open(player);
 
 ---
 
-## 6. PaginatedMenu Reference
+## 7. PaginatedMenu Reference
 
 `PaginatedMenu` simplifies displaying lists of items across multiple pages, handling page navigation arrows and content distribution automatically.
 

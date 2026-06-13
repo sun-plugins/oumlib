@@ -16,10 +16,13 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.profile.PlayerTextures;
+import org.jetbrains.annotations.CheckReturnValue;
 import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
 import java.lang.reflect.Field;
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,33 +48,39 @@ public final class ItemBuilder {
     }
 
     @Contract("_ -> new")
+    @CheckReturnValue
     public static @NonNull ItemBuilder of(Material material) {
         return new ItemBuilder(material);
     }
 
     @Contract("_ -> new")
+    @CheckReturnValue
     public static @NonNull ItemBuilder of(ItemStack item) {
         return new ItemBuilder(item);
     }
 
-    public ItemBuilder name(String miniMessage) {
+    @CheckReturnValue
+    public @NonNull ItemBuilder name(@NonNull String miniMessage) {
         meta.displayName(MM.deserialize("<!italic>" + miniMessage));
         return this;
     }
 
-    public ItemBuilder lore(String... lines) {
+    @CheckReturnValue
+    public @NonNull ItemBuilder lore(String @NonNull ... lines) {
         meta.lore(Arrays.stream(lines)
                 .map(l -> MM.deserialize("<!italic><gray>" + l))
                 .collect(Collectors.toList()));
         return this;
     }
 
-    public ItemBuilder clearLore() {
+    @CheckReturnValue
+    public @NonNull ItemBuilder clearLore() {
         meta.lore(null);
         return this;
     }
 
-    public ItemBuilder addLore(String... lines) {
+    @CheckReturnValue
+    public @NonNull ItemBuilder addLore(String @NonNull ... lines) {
         List<Component> currentLore = meta.lore();
         if (currentLore == null) currentLore = new ArrayList<>();
         List<Component> newLines = Arrays.stream(lines)
@@ -82,73 +91,87 @@ public final class ItemBuilder {
         return this;
     }
 
-    public ItemBuilder amount(int amount) {
+    @CheckReturnValue
+    public @NonNull ItemBuilder amount(int amount) {
         stack.setAmount(amount);
         return this;
     }
 
-    public ItemBuilder type(Material material) {
+    @CheckReturnValue
+    public @NonNull ItemBuilder type(@NonNull Material material) {
         stack = stack.withType(material);
         return this;
     }
 
-    public ItemBuilder enchant(Enchantment e, int level) {
+    @CheckReturnValue
+    public @NonNull ItemBuilder enchant(@NonNull Enchantment e, int level) {
         meta.addEnchant(e, level, true);
         return this;
     }
 
-    public ItemBuilder glow() {
+    @CheckReturnValue
+    public @NonNull ItemBuilder glow() {
         meta.addEnchant(Enchantment.UNBREAKING, 1, true);
         meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
         return this;
     }
 
-    public ItemBuilder flag(ItemFlag... flags) {
+    @CheckReturnValue
+    public @NonNull ItemBuilder flag(ItemFlag @NonNull ... flags) {
         meta.addItemFlags(flags);
         return this;
     }
 
-    public ItemBuilder customModelData(Integer data) {
+    @CheckReturnValue
+    @SuppressWarnings("deprecation")
+    public @NonNull ItemBuilder customModelData(@Nullable Integer data) {
         meta.setCustomModelData(data);
         return this;
     }
 
-    public ItemBuilder unbreakable(boolean value) {
+    @CheckReturnValue
+    public @NonNull ItemBuilder unbreakable(boolean value) {
         meta.setUnbreakable(value);
         return this;
     }
 
-    public ItemBuilder pdc(String key, String value) {
+    @CheckReturnValue
+    public @NonNull ItemBuilder pdc(@NonNull String key, @NonNull String value) {
         NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
         meta.getPersistentDataContainer().set(nsk, PersistentDataType.STRING, value);
         return this;
     }
 
-    public ItemBuilder pdc(String key, int value) {
+    @CheckReturnValue
+    public @NonNull ItemBuilder pdc(@NonNull String key, int value) {
         NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
         meta.getPersistentDataContainer().set(nsk, PersistentDataType.INTEGER, value);
         return this;
     }
 
-    public ItemBuilder pdc(String key, double value) {
+    @CheckReturnValue
+    public @NonNull ItemBuilder pdc(@NonNull String key, double value) {
         NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
         meta.getPersistentDataContainer().set(nsk, PersistentDataType.DOUBLE, value);
         return this;
     }
 
-    public ItemBuilder pdc(String key, boolean value) {
+    @CheckReturnValue
+    public @NonNull ItemBuilder pdc(@NonNull String key, boolean value) {
         NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
         meta.getPersistentDataContainer().set(nsk, PersistentDataType.BYTE, (byte) (value ? 1 : 0));
         return this;
     }
 
-    public ItemBuilder pdc(String key, long value) {
+    @CheckReturnValue
+    public @NonNull ItemBuilder pdc(@NonNull String key, long value) {
         NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
         meta.getPersistentDataContainer().set(nsk, PersistentDataType.LONG, value);
         return this;
     }
 
-    public ItemBuilder pdc(String key, List<String> value) {
+    @CheckReturnValue
+    public @NonNull ItemBuilder pdc(@NonNull String key, @Nullable List<String> value) {
         NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
         if (value == null) {
             meta.getPersistentDataContainer().remove(nsk);
@@ -158,19 +181,23 @@ public final class ItemBuilder {
         return this;
     }
 
-    public ItemBuilder skull(OfflinePlayer player) {
+    @CheckReturnValue
+    @SuppressWarnings("unused")
+    public @NonNull ItemBuilder skull(@NonNull OfflinePlayer player) {
         if (meta instanceof SkullMeta skullMeta) {
             skullMeta.setOwningPlayer(player);
         }
         return this;
     }
 
-    public ItemBuilder skull(String textureValue) {
+    @CheckReturnValue
+    @SuppressWarnings("unused")
+    public @NonNull ItemBuilder skull(@NonNull String textureValue) {
         if (meta instanceof SkullMeta skullMeta) {
             try {
                 PlayerProfile profile = Bukkit.createProfile(UUID.randomUUID(), null);
                 PlayerTextures textures = profile.getTextures();
-                URL url = new URL("http://textures.minecraft.net/texture/" + textureValue);
+                URL url = URI.create("https://textures.minecraft.net/texture/" + textureValue).toURL();
                 textures.setSkin(url);
                 profile.setTextures(textures);
                 skullMeta.setPlayerProfile(profile);
@@ -195,7 +222,8 @@ public final class ItemBuilder {
         return this;
     }
 
-    public ItemStack build() {
+    @Contract(" -> new")
+    public @NonNull ItemStack build() {
         stack.setItemMeta(meta);
         return stack;
     }

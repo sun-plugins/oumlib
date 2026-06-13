@@ -1,8 +1,10 @@
 package dev.oum.oumlib.inventory;
 
 import dev.oum.oumlib.event.Events;
+import dev.oum.oumlib.event.ListenerHandle;
 import dev.oum.oumlib.scheduler.Scheduler;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -14,9 +16,12 @@ import org.bukkit.inventory.AnvilInventory;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.view.AnvilView;
+import org.jetbrains.annotations.CheckReturnValue;
 import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -36,15 +41,20 @@ public final class AnvilMenu implements Menu {
     private final Map<UUID, Integer> originalLevels = new HashMap<>();
     private final Map<UUID, Float> originalExp = new HashMap<>();
 
+    private ListenerHandle clickHandle;
+    private ListenerHandle closeHandle;
+    private ListenerHandle quitHandle;
+    private ListenerHandle prepareHandle;
+
     private AnvilMenu(@NonNull Builder builder) {
         this.title = builder.title;
         this.placeholder = builder.placeholder;
         this.onConfirm = builder.onConfirm;
         this.onClose = builder.onClose;
-        registerListeners();
     }
 
     @Contract(value = " -> new", pure = true)
+    @CheckReturnValue
     public static @NonNull Builder builder() {
         return new Builder();
     }
@@ -62,6 +72,7 @@ public final class AnvilMenu implements Menu {
         }
 
         open.put(player.getUniqueId(), inv);
+        registerListeners();
         player.openInventory(inv);
     }
 
@@ -70,6 +81,9 @@ public final class AnvilMenu implements Menu {
         open.remove(player.getUniqueId());
         restoreExperience(player);
         player.closeInventory();
+        if (open.isEmpty()) {
+            unregisterListeners();
+        }
     }
 
     private void restoreExperience(@NonNull Player player) {
@@ -81,46 +95,63 @@ public final class AnvilMenu implements Menu {
         }
     }
 
-    private void registerListeners() {
-        Events.listen(InventoryClickEvent.class, event -> {
+    private synchronized void registerListeners() {
+        if (clickHandle != null && clickHandle.isActive()) return;
+        MenuRegistry.register(this);
+
+        clickHandle = Events.listen(InventoryClickEvent.class, event -> {
             if (!(event.getWhoClicked() instanceof Player player)) return;
             Inventory inv = open.get(player.getUniqueId());
             if (inv == null) return;
-            if (event.getInventory().getType() != InventoryType.ANVIL) return;
+            if (event.getClickedInventory() == null || !event.getClickedInventory().equals(inv)) {
+                event.setCancelled(true);
+                return;
+            }
             if (event.getSlot() != 2) {
                 event.setCancelled(true);
                 return;
             }
+            event.setCancelled(true);
             if (!(event.getView() instanceof AnvilView anvilView)) return;
             var input = anvilView.getRenameText();
             open.remove(player.getUniqueId());
             restoreExperience(player);
             player.closeInventory();
+            if (open.isEmpty()) {
+                unregisterListeners();
+            }
             if (onConfirm != null) onConfirm.accept(player, input != null ? input : "");
         });
 
-        Events.listen(InventoryCloseEvent.class, event -> {
+        closeHandle = Events.listen(InventoryCloseEvent.class, event -> {
             if (!(event.getPlayer() instanceof Player player)) return;
             if (open.remove(player.getUniqueId()) != null) {
                 restoreExperience(player);
+                if (open.isEmpty()) {
+                    unregisterListeners();
+                }
                 if (onClose != null) {
                     onClose.accept(player);
                 }
             }
         });
 
-        Events.listen(PlayerQuitEvent.class, event -> {
+        quitHandle = Events.listen(PlayerQuitEvent.class, event -> {
             Player player = event.getPlayer();
             if (open.remove(player.getUniqueId()) != null) {
                 restoreExperience(player);
+                if (open.isEmpty()) {
+                    unregisterListeners();
+                }
             }
         });
 
-        Events.listen(PrepareAnvilEvent.class, event -> {
+        prepareHandle = Events.listen(PrepareAnvilEvent.class, event -> {
             if (!(event.getView().getPlayer() instanceof Player player)) return;
             Inventory openInv = open.get(player.getUniqueId());
             if (openInv == null) return;
-            if (!(event.getView() instanceof AnvilView anvilView)) return;
+            if (!event.getInventory().equals(openInv)) return;
+            AnvilView anvilView = event.getView();
             AnvilInventory inv = event.getInventory();
             ItemStack first = inv.getItem(0);
             if (first == null) return;
@@ -133,8 +164,45 @@ public final class AnvilMenu implements Menu {
             ItemStack result = ItemBuilder.of(first.getType()).name(renameText).build();
             event.setResult(result);
 
-            Scheduler.run(() -> anvilView.setRepairCost(0));
+            anvilView.setRepairCost(0);
+            Scheduler.run(() -> {
+                anvilView.setRepairCost(0);
+            });
         });
+    }
+
+    private synchronized void unregisterListeners() {
+        MenuRegistry.unregister(this);
+        if (clickHandle != null) {
+            clickHandle.unregister();
+            clickHandle = null;
+        }
+        if (closeHandle != null) {
+            closeHandle.unregister();
+            closeHandle = null;
+        }
+        if (quitHandle != null) {
+            quitHandle.unregister();
+            quitHandle = null;
+        }
+        if (prepareHandle != null) {
+            prepareHandle.unregister();
+            prepareHandle = null;
+        }
+    }
+
+    public void closeAll() {
+        new ArrayList<>(open.keySet()).forEach(uuid -> {
+            Player p = Bukkit.getPlayer(uuid);
+            if (p != null) {
+                restoreExperience(p);
+                p.closeInventory();
+            }
+        });
+        open.clear();
+        originalLevels.clear();
+        originalExp.clear();
+        unregisterListeners();
     }
 
     public static final class Builder {
@@ -144,22 +212,26 @@ public final class AnvilMenu implements Menu {
         private BiConsumer<Player, String> onConfirm;
         private Consumer<Player> onClose;
 
-        public Builder title(String title) {
+        @CheckReturnValue
+        public @NonNull Builder title(@NonNull String title) {
             this.title = title;
             return this;
         }
 
-        public Builder placeholder(String p) {
+        @CheckReturnValue
+        public @NonNull Builder placeholder(@NonNull String p) {
             this.placeholder = p;
             return this;
         }
 
-        public Builder onConfirm(BiConsumer<Player, String> handler) {
+        @CheckReturnValue
+        public @NonNull Builder onConfirm(@NonNull BiConsumer<@NonNull Player, @NonNull String> handler) {
             this.onConfirm = handler;
             return this;
         }
 
-        public Builder onClose(Consumer<Player> handler) {
+        @CheckReturnValue
+        public @NonNull Builder onClose(@Nullable Consumer<@NonNull Player> handler) {
             this.onClose = handler;
             return this;
         }

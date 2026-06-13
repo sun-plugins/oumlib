@@ -1,6 +1,8 @@
 package dev.oum.oumlib.inventory;
 
 import dev.oum.oumlib.event.Events;
+import dev.oum.oumlib.event.ListenerHandle;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -9,6 +11,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.jetbrains.annotations.CheckReturnValue;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 
@@ -31,6 +34,9 @@ public final class PaginatedMenu implements Menu {
     private final Map<UUID, Integer> pages = new HashMap<>();
     private final Map<UUID, Inventory> open = new HashMap<>();
 
+    private ListenerHandle clickHandle;
+    private ListenerHandle closeHandle;
+
     private PaginatedMenu(@NonNull Builder builder) {
         this.title = builder.title;
         this.rows = builder.rows;
@@ -41,10 +47,10 @@ public final class PaginatedMenu implements Menu {
         this.nextButton = builder.nextButton;
         this.items = List.copyOf(builder.items);
         this.clickHandler = builder.clickHandler;
-        registerClickListener();
     }
 
     @Contract(" -> new")
+    @CheckReturnValue
     public static @NonNull Builder builder() {
         return new Builder();
     }
@@ -56,15 +62,21 @@ public final class PaginatedMenu implements Menu {
     @Override
     public void open(@NonNull Player player) {
         pages.putIfAbsent(player.getUniqueId(), 1);
+        registerListeners();
         reopen(player);
     }
 
     @Override
     public void close(@NonNull Player player) {
         open.remove(player.getUniqueId());
+        pages.remove(player.getUniqueId());
         player.closeInventory();
+        if (open.isEmpty()) {
+            unregisterListeners();
+        }
     }
 
+    @SuppressWarnings("unused")
     public void refresh(@NonNull Player player) {
         Inventory inv = open.get(player.getUniqueId());
         if (inv == null) return;
@@ -72,15 +84,34 @@ public final class PaginatedMenu implements Menu {
         player.updateInventory();
     }
 
+    @SuppressWarnings("deprecation")
     private void reopen(@NonNull Player player) {
         int page = pages.getOrDefault(player.getUniqueId(), 1);
         String resolvedTitle = title
                 .replace("<page>", String.valueOf(page))
                 .replace("<total>", String.valueOf(totalPages()));
-        Inventory inv = Bukkit.createInventory(null, rows * 9, MM.deserialize(resolvedTitle));
-        populateItems(inv, page);
-        open.put(player.getUniqueId(), inv);
-        player.openInventory(inv);
+        var titleComponent = MM.deserialize(resolvedTitle);
+
+        Inventory inv = open.get(player.getUniqueId());
+        if (inv != null) {
+            try {
+                var view = player.getOpenInventory();
+                try {
+                    var method = view.getClass().getMethod("setTitle", Component.class);
+                    method.invoke(view, titleComponent);
+                } catch (NoSuchMethodException e) {
+                    view.setTitle(resolvedTitle);
+                }
+            } catch (Exception ignored) {
+            }
+            populateItems(inv, page);
+            player.updateInventory();
+        } else {
+            inv = Bukkit.createInventory(null, rows * 9, titleComponent);
+            populateItems(inv, page);
+            open.put(player.getUniqueId(), inv);
+            player.openInventory(inv);
+        }
     }
 
     private void populateItems(@NonNull Inventory inv, int page) {
@@ -100,8 +131,11 @@ public final class PaginatedMenu implements Menu {
         inv.setItem(nextSlot, next);
     }
 
-    private void registerClickListener() {
-        Events.listen(InventoryClickEvent.class, event -> {
+    private synchronized void registerListeners() {
+        if (clickHandle != null && clickHandle.isActive()) return;
+        MenuRegistry.register(this);
+
+        clickHandle = Events.listen(InventoryClickEvent.class, event -> {
             if (!(event.getWhoClicked() instanceof Player player)) return;
             Inventory inv = open.get(player.getUniqueId());
             if (inv == null || !event.getInventory().equals(inv)) return;
@@ -124,9 +158,9 @@ public final class PaginatedMenu implements Menu {
                         int idx = (page - 1) * contentSlots.length + i;
                         if (idx < items.size()) {
                             clickHandler.onClick(
-                                    new ClickContext(player, ClickAction.from(event.getClick()), slot),
-                                    items.get(idx),
-                                    idx
+                                     new ClickContext(player, ClickAction.from(event.getClick()), slot, this),
+                                     items.get(idx),
+                                     idx
                             );
                         }
                         break;
@@ -135,14 +169,41 @@ public final class PaginatedMenu implements Menu {
             }
         });
 
-        Events.listen(InventoryCloseEvent.class, event -> {
+        closeHandle = Events.listen(InventoryCloseEvent.class, event -> {
             if (!(event.getPlayer() instanceof Player player)) return;
             Inventory inv = open.get(player.getUniqueId());
             if (inv != null && event.getInventory().equals(inv)) {
                 open.remove(player.getUniqueId());
                 pages.remove(player.getUniqueId());
+                if (open.isEmpty()) {
+                    unregisterListeners();
+                }
             }
         });
+    }
+
+    private synchronized void unregisterListeners() {
+        MenuRegistry.unregister(this);
+        if (clickHandle != null) {
+            clickHandle.unregister();
+            clickHandle = null;
+        }
+        if (closeHandle != null) {
+            closeHandle.unregister();
+            closeHandle = null;
+        }
+    }
+
+    public void closeAll() {
+        new ArrayList<>(open.keySet()).forEach(uuid -> {
+            Player p = Bukkit.getPlayer(uuid);
+            if (p != null) {
+                p.closeInventory();
+            }
+        });
+        open.clear();
+        pages.clear();
+        unregisterListeners();
     }
 
     @FunctionalInterface
@@ -164,39 +225,47 @@ public final class PaginatedMenu implements Menu {
                 .name("<gray>Next").build();
         private PaginatedClickHandler clickHandler;
 
-        public Builder onClick(PaginatedClickHandler handler) {
+        @CheckReturnValue
+        @SuppressWarnings("unused")
+        public @NonNull Builder onClick(@NonNull PaginatedClickHandler handler) {
             this.clickHandler = handler;
             return this;
         }
 
-        public Builder title(String title) {
+        @CheckReturnValue
+        public @NonNull Builder title(@NonNull String title) {
             this.title = title;
             return this;
         }
 
-        public Builder rows(int rows) {
+        @CheckReturnValue
+        public @NonNull Builder rows(int rows) {
             this.rows = rows;
             return this;
         }
 
-        public Builder contentSlots(int... slots) {
+        @CheckReturnValue
+        public @NonNull Builder contentSlots(int @NonNull ... slots) {
             this.contentSlots = slots;
             return this;
         }
 
-        public Builder previousButton(Function<Integer, ItemStack> fn, int slot) {
+        @CheckReturnValue
+        public @NonNull Builder previousButton(@NonNull Function<@NonNull Integer, @NonNull ItemStack> fn, int slot) {
             prevButton = fn;
             prevSlot = slot;
             return this;
         }
 
-        public Builder nextButton(Function<Integer, ItemStack> fn, int slot) {
+        @CheckReturnValue
+        public @NonNull Builder nextButton(@NonNull Function<@NonNull Integer, @NonNull ItemStack> fn, int slot) {
             nextButton = fn;
             nextSlot = slot;
             return this;
         }
 
-        public Builder items(List<ItemStack> items) {
+        @CheckReturnValue
+        public @NonNull Builder items(@NonNull List<@NonNull ItemStack> items) {
             this.items.addAll(items);
             return this;
         }

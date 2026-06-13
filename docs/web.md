@@ -68,7 +68,7 @@ WebhookEmbed matchEmbed = WebhookEmbed.builder()
     .title("Leaderboard Update")
     .description("A new player has entered the top leaderboard!")
     .color(0x55FF55)
-    .field("Player", "maceful", false)
+    .field("Player", "rompepitas", false)
     .field("Wins", "150", true)
     .field("Win Rate", "74.5%", true)
     .footer("Leaderboards Tracker", null)
@@ -78,4 +78,35 @@ Webhook.url("https://discord.com/api/webhooks/...")
     .username("Leaderboards")
     .embed(matchEmbed)
     .sendAsync();
+```
+
+---
+
+## 3. Webhook Queuing & Rate Limiting
+
+To prevent rate limiting when dispatching multiple logs in rapid succession (e.g. chat logging, block tracking), OumLib features a built-in message and embed buffering system. Messages/embeds are queued, consolidated, and sent in batch batches of up to 10 embeds or merged multiline text blocks every second.
+
+### Queuing Text Messages:
+```java
+import dev.oum.oumlib.web.Webhook;
+
+String webhookUrl = "https://discord.com/api/webhooks/...";
+
+// These will be grouped together and sent as a single combined message
+Webhook.queueMessage(webhookUrl, "[Log] Player sun_mc joined the game.");
+Webhook.queueMessage(webhookUrl, "[Log] Player rompepitas joined the game.");
+```
+
+### Queuing Embeds:
+```java
+import dev.oum.oumlib.web.Webhook;
+import dev.oum.oumlib.web.WebhookEmbed;
+
+WebhookEmbed alert = WebhookEmbed.builder()
+    .title("Anti-Cheat Alert")
+    .description("rompepitas flagged Killaura")
+    .build();
+
+// Queues the embed to be batched and sent automatically in the background
+Webhook.queueEmbed(webhookUrl, alert);
 ```

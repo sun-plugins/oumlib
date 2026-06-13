@@ -43,4 +43,20 @@ public final class Particles {
     public static void spawnDust(@NonNull Location loc, @NonNull Color color, float size, int count) {
         spawn(loc, Particle.DUST, count, 0, 0, 0, 1, new Particle.DustOptions(color, size));
     }
+
+    public static void spawnDust(@NonNull Location loc, @NonNull Color color, float size, int count, double offsetX, double offsetY, double offsetZ) {
+        spawn(loc, Particle.DUST, count, offsetX, offsetY, offsetZ, 1, new Particle.DustOptions(color, size));
+    }
+
+    public static void spawnDustTransition(@NonNull Location loc, @NonNull Color fromColor, @NonNull Color toColor, float size) {
+        spawnDustTransition(loc, fromColor, toColor, size, 1);
+    }
+
+    public static void spawnDustTransition(@NonNull Location loc, @NonNull Color fromColor, @NonNull Color toColor, float size, int count) {
+        spawn(loc, Particle.DUST_COLOR_TRANSITION, count, 0, 0, 0, 1, new Particle.DustTransition(fromColor, toColor, size));
+    }
+
+    public static void spawnDustTransition(@NonNull Location loc, @NonNull Color fromColor, @NonNull Color toColor, float size, int count, double offsetX, double offsetY, double offsetZ) {
+        spawn(loc, Particle.DUST_COLOR_TRANSITION, count, offsetX, offsetY, offsetZ, 1, new Particle.DustTransition(fromColor, toColor, size));
+    }
 }

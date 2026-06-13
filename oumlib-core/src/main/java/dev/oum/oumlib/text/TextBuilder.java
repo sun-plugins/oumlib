@@ -5,6 +5,8 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.jetbrains.annotations.CheckReturnValue;
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 
 public final class TextBuilder {
@@ -17,22 +19,26 @@ public final class TextBuilder {
         this.raw = raw;
     }
 
-    public TextBuilder clickRunCommand(String command) {
+    @CheckReturnValue
+    public @NonNull TextBuilder clickRunCommand(@NonNull String command) {
         this.clickEvent = ClickEvent.runCommand(command);
         return this;
     }
 
-    public TextBuilder clickSuggestCommand(String command) {
+    @CheckReturnValue
+    public @NonNull TextBuilder clickSuggestCommand(@NonNull String command) {
         this.clickEvent = ClickEvent.suggestCommand(command);
         return this;
     }
 
-    public TextBuilder hoverText(String text) {
+    @CheckReturnValue
+    public @NonNull TextBuilder hoverText(@NonNull String text) {
         this.hoverText = MiniMessage.miniMessage().deserialize(text);
         return this;
     }
 
-    public Component build() {
+    @Contract(" -> new")
+    public @NonNull Component build() {
         Component c = MiniMessage.miniMessage().deserialize(raw);
         if (clickEvent != null) c = c.clickEvent(clickEvent);
         if (hoverText != null) c = c.hoverEvent(HoverEvent.showText(hoverText));

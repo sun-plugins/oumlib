@@ -8,6 +8,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.jetbrains.annotations.CheckReturnValue;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -18,11 +19,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 
-@SuppressWarnings({"UnstableApiUsage", "unused"})
+@SuppressWarnings({"unused"})
 public final class TextInput {
 
     private static final Map<UUID, Session> sessions = new ConcurrentHashMap<>();
     private static boolean listenersRegistered = false;
+
+    private TextInput() {
+    }
 
     private static void ensureListeners() {
         if (listenersRegistered) return;
@@ -40,7 +44,7 @@ public final class TextInput {
                 Session activeSession = sessions.get(player.getUniqueId());
                 if (activeSession == null) return;
 
-                if (activeSession.cancelWord != null && message.equalsIgnoreCase(activeSession.cancelWord)) {
+                if (message.equalsIgnoreCase(activeSession.cancelWord)) {
                     cancel(player.getUniqueId());
                     if (activeSession.cancelCallback != null) {
                         activeSession.cancelCallback.accept(player);
@@ -60,9 +64,7 @@ public final class TextInput {
         });
     }
 
-    private TextInput() {
-    }
-
+    @CheckReturnValue
     public static @NonNull Builder builder() {
         ensureListeners();
         return new Builder();
@@ -98,39 +100,48 @@ public final class TextInput {
         private Builder() {
         }
 
-        public Builder timeout(@NonNull Duration timeout) {
+        @CheckReturnValue
+        public @NonNull Builder timeout(@NonNull Duration timeout) {
             this.timeout = timeout;
             return this;
         }
 
-        public Builder prompt(@Nullable Component prompt) {
+        @CheckReturnValue
+        public @NonNull Builder prompt(@Nullable Component prompt) {
             this.prompt = prompt;
             return this;
         }
 
-        public Builder onInput(@NonNull BiPredicate<Player, String> inputCallback) {
+        @CheckReturnValue
+        public @NonNull Builder onInput(@NonNull BiPredicate<Player, String> inputCallback) {
             this.inputCallback = inputCallback;
             return this;
         }
 
-        public Builder onCancel(@Nullable Consumer<Player> cancelCallback) {
+        @CheckReturnValue
+        public @NonNull Builder onCancel(@Nullable Consumer<Player> cancelCallback) {
             this.cancelCallback = cancelCallback;
             return this;
         }
 
-        public Builder onTimeout(@Nullable Consumer<Player> timeoutCallback) {
+        @CheckReturnValue
+        public @NonNull Builder onTimeout(@Nullable Consumer<Player> timeoutCallback) {
             this.timeoutCallback = timeoutCallback;
             return this;
         }
 
-        public Builder cancelWord(@Nullable String cancelWord) {
+        @CheckReturnValue
+        public @NonNull Builder cancelWord(@Nullable String cancelWord) {
             this.cancelWord = cancelWord;
             return this;
         }
 
         public void start(@NonNull Player player) {
+            if (inputCallback == null) {
+                throw new IllegalStateException("inputCallback must be set via onInput before starting a TextInput session");
+            }
             UUID uuid = player.getUniqueId();
-            
+
             Scheduler.runFor(player, () -> {
                 TextInput.cancel(uuid);
 
@@ -160,5 +171,6 @@ public final class TextInput {
             Consumer<Player> cancelCallback,
             Consumer<Player> timeoutCallback,
             String cancelWord
-    ) {}
+    ) {
+    }
 }

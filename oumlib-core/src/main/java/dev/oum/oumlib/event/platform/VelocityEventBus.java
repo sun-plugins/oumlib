@@ -43,11 +43,11 @@ public final class VelocityEventBus implements EventBusAdapter {
 
     private static short toPriority(@NonNull EventPriority priority) {
         return switch (priority) {
-            case LOWEST -> (short) (Short.MAX_VALUE - 1);
-            case LOW -> (short) (Short.MAX_VALUE / 2);
+            case LOWEST -> (short) (Short.MIN_VALUE + 1);
+            case LOW -> (short) (Short.MIN_VALUE / 2);
             case NORMAL -> 0;
-            case HIGH -> (short) (Short.MIN_VALUE / 2);
-            case HIGHEST, MONITOR -> (short) (Short.MIN_VALUE + 1);
+            case HIGH -> (short) (Short.MAX_VALUE / 2);
+            case HIGHEST, MONITOR -> (short) (Short.MAX_VALUE - 1);
         };
     }
 

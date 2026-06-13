@@ -118,9 +118,16 @@ public final class VelocityCommandRegistrar implements CommandRegistrar {
             Consumer<CommandContext> exec,
             @NonNull CommandBuilder builder
     ) {
+        CommandContext context = new CommandContext(source, source, builder.label(), map);
         if (builder.cooldown() != null && source instanceof Player player) {
-            String bypassPerm = (builder.permission() != null ? builder.permission() : builder.label()) + ".bypass";
-            if (!player.hasPermission(bypassPerm) && builder.cooldown().isOnCooldown(player.getUniqueId())) {
+            boolean bypassed;
+            if (builder.cooldownBypass() != null) {
+                bypassed = builder.cooldownBypass().test(context);
+            } else {
+                String bypassPerm = (builder.permission() != null ? builder.permission() : builder.label()) + ".bypass";
+                bypassed = player.hasPermission(bypassPerm);
+            }
+            if (!bypassed && builder.cooldown().isOnCooldown(player.getUniqueId())) {
                 long remaining = builder.cooldown().remainingSeconds(player.getUniqueId());
                 player.sendMessage(MiniMessage.miniMessage()
                         .deserialize(builder.cooldownMessage().replace("<remaining>", String.valueOf(remaining))));
@@ -128,6 +135,6 @@ public final class VelocityCommandRegistrar implements CommandRegistrar {
             }
             builder.cooldown().set(player.getUniqueId());
         }
-        exec.accept(new CommandContext(source, source, builder.label(), map));
+        exec.accept(context);
     }
 }

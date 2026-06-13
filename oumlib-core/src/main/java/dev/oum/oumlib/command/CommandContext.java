@@ -5,6 +5,7 @@ import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 
 public record CommandContext(
@@ -47,6 +48,39 @@ public record CommandContext(
         } catch (ClassNotFoundException ignored) {
         }
         VELOCITY_CONSOLE = vc;
+    }
+
+    @Contract("_ -> new")
+    public static @NonNull CommandContext fromBrigadier(com.mojang.brigadier.context.@NonNull CommandContext<?> brigadierCtx) {
+        Object source = brigadierCtx.getSource();
+        Audience sender;
+        String label = "";
+        try {
+            Class<?> cssClass = Class.forName("io.papermc.paper.command.brigadier.CommandSourceStack");
+            if (cssClass.isInstance(source)) {
+                sender = (Audience) cssClass.getMethod("getSender").invoke(source);
+            } else {
+                sender = (Audience) source;
+            }
+        } catch (Throwable t) {
+            sender = (Audience) source;
+        }
+
+        try {
+            String input = brigadierCtx.getInput();
+            if (input != null && !input.isEmpty()) {
+                String[] parts = input.split(" ");
+                if (parts.length > 0) {
+                    label = parts[0];
+                    if (label.startsWith("/")) {
+                        label = label.substring(1);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+
+        return new CommandContext(source, sender, label, new ArgumentMap(brigadierCtx));
     }
 
     public @NonNull Audience sender() {
