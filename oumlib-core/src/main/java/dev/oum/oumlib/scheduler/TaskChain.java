@@ -120,5 +120,5 @@ public final class TaskChain<T> {
         SYNC, ASYNC, DELAY, DELAY_TICKS
     }
 
-    private static record ChainTask(TaskType type, Function<Object, Object> action) {}
+    private record ChainTask(TaskType type, Function<Object, Object> action) {}
 }
