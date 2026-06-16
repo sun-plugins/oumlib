@@ -2,7 +2,9 @@ package dev.oum.oumlib.command;
 
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import dev.oum.oumlib.OumLib;
 import dev.oum.oumlib.util.Format;
@@ -11,6 +13,7 @@ import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -161,6 +164,76 @@ public final class Arguments {
     public static @NonNull Argument<Duration> duration(String name) {
         return new Argument<>(name, StringArgumentType.word(), (raw, ctx)
                 -> Format.parseDuration(raw.toString()));
+    }
+
+    @Contract("_ -> new")
+    public static @NonNull Argument<Float> floatArg(String name) {
+        return new Argument<>(name, FloatArgumentType.floatArg(), (raw, ctx) -> (Float) raw);
+    }
+
+    @Contract("_, _, _ -> new")
+    public static @NonNull Argument<Float> floatArg(String name, float min, float max) {
+        return new Argument<>(name, FloatArgumentType.floatArg(min, max), (raw, ctx) -> (Float) raw);
+    }
+
+    @Contract("_ -> new")
+    public static @NonNull Argument<Long> longArg(String name) {
+        return new Argument<>(name, LongArgumentType.longArg(), (raw, ctx) -> (Long) raw);
+    }
+
+    @Contract("_, _, _ -> new")
+    public static @NonNull Argument<Long> longArg(String name, long min, long max) {
+        return new Argument<>(name, LongArgumentType.longArg(min, max), (raw, ctx) -> (Long) raw);
+    }
+
+    @Contract("_ -> new")
+    @SuppressWarnings("DataFlowIssue")
+    public static @NonNull Argument<?> offlinePlayer(String name) {
+        try {
+            Class.forName("org.bukkit.Bukkit");
+            return new Argument<>(name, StringArgumentType.word(), (raw, ctx) -> {
+                String nameStr = (String) raw;
+                return org.bukkit.Bukkit.getOfflinePlayer(nameStr);
+            }).suggests(context -> {
+                try {
+                    List<String> suggestions = new ArrayList<>();
+                    for (org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+                        suggestions.add(p.getName());
+                    }
+                    return suggestions;
+                } catch (Throwable t) {
+                    return List.of();
+                }
+            });
+        } catch (Exception ignored) {
+        }
+        return new Argument<>(name, StringArgumentType.word(), (raw, ctx) -> (String) raw);
+    }
+
+    @Contract("_ -> new")
+    @SuppressWarnings("DataFlowIssue")
+    public static @NonNull Argument<?> entity(String name) {
+        try {
+            Class.forName("io.papermc.paper.command.brigadier.argument.ArgumentTypes");
+            return (Argument<?>) Class.forName("dev.oum.oumlib.command.platform.PaperCommandHelper")
+                    .getDeclaredMethod("createEntityArgument", String.class)
+                    .invoke(null, name);
+        } catch (Exception ignored) {
+        }
+        throw new UnsupportedOperationException("Entity argument is only supported on Paper.");
+    }
+
+    @Contract("_ -> new")
+    @SuppressWarnings("DataFlowIssue")
+    public static @NonNull Argument<?> entities(String name) {
+        try {
+            Class.forName("io.papermc.paper.command.brigadier.argument.ArgumentTypes");
+            return (Argument<?>) Class.forName("dev.oum.oumlib.command.platform.PaperCommandHelper")
+                    .getDeclaredMethod("createEntitiesArgument", String.class)
+                    .invoke(null, name);
+        } catch (Exception ignored) {
+        }
+        throw new UnsupportedOperationException("Entities argument is only supported on Paper.");
     }
 
     @Deprecated(since = "1.0.1", forRemoval = true)

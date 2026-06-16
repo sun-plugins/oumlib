@@ -27,6 +27,37 @@ public final class ArgumentMap {
         });
     }
 
+    @SuppressWarnings("unchecked")
+    public <T> T get(@NonNull String name, @NonNull Class<T> clazz) {
+        return (T) cache.computeIfAbsent(name, k -> {
+            try {
+                return ctx.getArgument(k, clazz);
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+        });
+    }
+
+    public @NonNull String getString(@NonNull String name) {
+        String val = get(name, String.class);
+        return val != null ? val : "";
+    }
+
+    public int getInt(@NonNull String name) {
+        Integer val = get(name, Integer.class);
+        return val != null ? val : 0;
+    }
+
+    public double getDouble(@NonNull String name) {
+        Double val = get(name, Double.class);
+        return val != null ? val : 0.0;
+    }
+
+    public boolean getBoolean(@NonNull String name) {
+        Boolean val = get(name, Boolean.class);
+        return val != null && val;
+    }
+
     public CommandContext<?> raw() {
         return ctx;
     }

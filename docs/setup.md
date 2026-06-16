@@ -101,3 +101,6 @@ If you shade OumLib into multiple plugins running on the same server, you **must
 - The Java Virtual Machine will load only one instance of the `OumLib` class files (usually from the plugin that loaded first).
 - Callbacks, scheduler mappings, and internal variables of the other plugins will overwrite each other, causing errors or silent failures.
 - Shading relocation keeps your plugin's dependency sandbox isolated.
+
+> [!NOTE]
+> All compile-scope dependencies utilized internally by OumLib (such as HikariCP) are automatically relocated to `dev.oum.oumlib.internal.hikari` when the OumLib jar is built. This ensures that downstream plugin developers only need to relocate the main `dev.oum.oumlib` package prefix (e.g. to `your.plugin.oumlib`) and all nested internal dependencies will automatically follow without needing manual relocation rules.

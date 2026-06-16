@@ -158,9 +158,9 @@ public final class PaginatedMenu implements Menu {
                         int idx = (page - 1) * contentSlots.length + i;
                         if (idx < items.size()) {
                             clickHandler.onClick(
-                                     new ClickContext(player, ClickAction.from(event.getClick()), slot, this),
-                                     items.get(idx),
-                                     idx
+                                    new ClickContext(player, ClickAction.from(event.getClick()), slot, this),
+                                    items.get(idx),
+                                    idx
                             );
                         }
                         break;

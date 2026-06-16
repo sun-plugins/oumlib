@@ -19,7 +19,9 @@ public final class EventBuilder<E> {
     private boolean onlyIfCancelled;
     private int maxFires = -1;
     private Duration expireAfter;
+    private Predicate<E> expireIf;
     private Consumer<E> handler;
+    private boolean async;
 
     EventBuilder(Class<E> type) {
         this.type = type;
@@ -55,6 +57,11 @@ public final class EventBuilder<E> {
         return this;
     }
 
+    public EventBuilder<E> expireIf(Predicate<E> condition) {
+        this.expireIf = condition;
+        return this;
+    }
+
     public @NonNull ListenerHandle handler(Consumer<E> handler) {
         this.handler = handler;
         return EventBus.register(this);
@@ -84,6 +91,10 @@ public final class EventBuilder<E> {
         return expireAfter;
     }
 
+    public Predicate<E> expireIf() {
+        return expireIf;
+    }
+
     public Consumer<E> handler() {
         return handler;
     }
@@ -93,5 +104,14 @@ public final class EventBuilder<E> {
     @Unmodifiable
     public List<Predicate<E>> filters() {
         return List.copyOf(filters);
+    }
+
+    public EventBuilder<E> async() {
+        this.async = true;
+        return this;
+    }
+
+    public boolean isAsync() {
+        return async;
     }
 }

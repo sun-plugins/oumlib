@@ -16,6 +16,8 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 
+import org.bukkit.entity.Entity;
+import io.papermc.paper.command.brigadier.argument.resolvers.selector.EntitySelectorArgumentResolver;
 import java.util.List;
 
 public final class PaperCommandHelper {
@@ -83,5 +85,30 @@ public final class PaperCommandHelper {
     @Contract("_ -> new")
     public static @NonNull Argument<NamespacedKey> createKeyArgument(String name) {
         return new Argument<>(name, ArgumentTypes.key(), (raw, ctx) -> (NamespacedKey) raw);
+    }
+
+    @Contract("_ -> new")
+    public static @NonNull Argument<Entity> createEntityArgument(String name) {
+        return new Argument<>(name, ArgumentTypes.entity(), (raw, ctx) -> {
+            EntitySelectorArgumentResolver resolver = (EntitySelectorArgumentResolver) raw;
+            try {
+                List<Entity> entities = resolver.resolve((CommandSourceStack) ctx.getSource());
+                return entities.isEmpty() ? null : entities.getFirst();
+            } catch (CommandSyntaxException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    @Contract("_ -> new")
+    public static @NonNull Argument<List<Entity>> createEntitiesArgument(String name) {
+        return new Argument<>(name, ArgumentTypes.entities(), (raw, ctx) -> {
+            EntitySelectorArgumentResolver resolver = (EntitySelectorArgumentResolver) raw;
+            try {
+                return resolver.resolve((CommandSourceStack) ctx.getSource());
+            } catch (CommandSyntaxException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 }

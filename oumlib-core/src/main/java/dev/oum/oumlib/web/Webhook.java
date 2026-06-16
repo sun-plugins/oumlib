@@ -143,13 +143,6 @@ public final class Webhook {
         return sb.toString();
     }
 
-    public @NonNull Promise<Void> sendAsync() {
-        return Promise.supplyAsync(() -> {
-            sendWithRetry(url, toJson(), 0);
-            return null;
-        });
-    }
-
     private static void sendWithRetry(String url, String json, int attempt) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -190,6 +183,13 @@ public final class Webhook {
                 throw new RuntimeException("Failed to send webhook request after 5 retries", e);
             }
         }
+    }
+
+    public @NonNull Promise<Void> sendAsync() {
+        return Promise.supplyAsync(() -> {
+            sendWithRetry(url, toJson(), 0);
+            return null;
+        });
     }
 
     private @NonNull String toJson() {

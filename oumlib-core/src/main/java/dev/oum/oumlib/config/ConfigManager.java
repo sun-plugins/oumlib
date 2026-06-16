@@ -26,6 +26,7 @@ public final class ConfigManager<T extends Record & ConfigSection> {
     private final Class<T> type;
     private T current;
     private Consumer<T> reloadCallback;
+    private ConfigMigrationRegistry migrationRegistry;
 
     private ConfigManager(Class<T> type, String fileName, Supplier<T> defaults) {
         this.type = type;
@@ -215,6 +216,11 @@ public final class ConfigManager<T extends Record & ConfigSection> {
         return this;
     }
 
+    public ConfigManager<T> migrate(@NonNull ConfigMigrationRegistry registry) {
+        this.migrationRegistry = registry;
+        return this;
+    }
+
     public ConfigManager<T> enableAutoReload() {
         File dir = OumLib.getDataFolder();
         if (!dir.exists()) {
@@ -276,6 +282,34 @@ public final class ConfigManager<T extends Record & ConfigSection> {
         Map<String, Object> yaml = YamlParser.parse(file);
         OumLib.logDebug("Parsed YAML map: " + yaml);
 
+        boolean migrated = false;
+        if (migrationRegistry != null && !migrationRegistry.migrations().isEmpty()) {
+            Object rawVer = yaml.get("config-version");
+            int currentVersion = 1;
+            if (rawVer instanceof Number num) {
+                currentVersion = num.intValue();
+            } else if (rawVer instanceof String str) {
+                try {
+                    currentVersion = Integer.parseInt(str);
+                } catch (NumberFormatException ignored) {
+                }
+            }
+
+            for (Map.Entry<Integer, Consumer<Map<String, Object>>> entry : migrationRegistry.migrations().entrySet()) {
+                int targetVersion = entry.getKey();
+                if (targetVersion > currentVersion) {
+                    OumLib.logDebug("Applying migration to version " + targetVersion + " for " + fileName);
+                    entry.getValue().accept(yaml);
+                    currentVersion = targetVersion;
+                    migrated = true;
+                }
+            }
+
+            if (migrated) {
+                yaml.put("config-version", currentVersion);
+            }
+        }
+
         // Collect unknown keys the user may have added — preserved on save.
         Map<String, Object> unknownKeys = new LinkedHashMap<>();
         for (String yamlKey : yaml.keySet()) {
@@ -292,9 +326,9 @@ public final class ConfigManager<T extends Record & ConfigSection> {
         T loaded = type.cast(reconstructValue(yaml, type, def));
         OumLib.logDebug("Reconstructed config object: " + loaded);
 
-        boolean needsSave = isMissingKey(yaml, type);
+        boolean needsSave = migrated || isMissingKey(yaml, type);
         if (needsSave) {
-            OumLib.logDebug("Config missing keys, saving updated config.");
+            OumLib.logDebug("Config missing keys or migrated, saving updated config.");
             save(file, loaded, unknownKeys);
         }
 

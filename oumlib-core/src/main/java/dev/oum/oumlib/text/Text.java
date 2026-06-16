@@ -98,7 +98,7 @@ public final class Text {
         return c;
     }
 
-    private static String resolve(String input, Object player, Object @NonNull ... pairs) {
+    private static @NonNull String resolve(String input, Object player, Object @NonNull ... pairs) {
         String result = input;
         for (int i = 0; i + 1 < pairs.length; i += 2) {
             result = result.replace("<" + pairs[i] + ">", MM.escapeTags(String.valueOf(pairs[i + 1])));
@@ -106,7 +106,7 @@ public final class Text {
         return PlaceholderResolver.resolveInternal(result, player);
     }
 
-    private static String resolve(String input, Object player) {
+    private static @NonNull String resolve(String input, Object player) {
         return PlaceholderResolver.resolveInternal(input, player);
     }
 
@@ -136,10 +136,10 @@ public final class Text {
                                         float progress, BossBar.@NonNull Color color, BossBar.@NonNull Overlay overlay,
                                         @NonNull Duration duration) {
         BossBar bar = bossBar(audience, titleMiniMessage, progress, color, overlay);
-        Scheduler.runDelayed(duration, () -> audience.hideBossBar(bar));
+        Scheduler.runLater(duration, () -> audience.hideBossBar(bar));
     }
 
-    public static void ascii(boolean colorized, String... lines) {
+    public static void ascii(boolean colorized, String @NonNull ... lines) {
         for (String line : lines) {
             if (colorized) {
                 OumLib.console().sendMessage(MM.deserialize(line));

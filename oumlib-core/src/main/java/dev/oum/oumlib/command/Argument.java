@@ -1,7 +1,7 @@
 package dev.oum.oumlib.command;
 
+import com.mojang.brigadier.Message;
 import com.mojang.brigadier.arguments.ArgumentType;
-import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import dev.oum.oumlib.scheduler.Scheduler;
 import org.jspecify.annotations.NonNull;
@@ -24,11 +24,11 @@ public final class Argument<T> {
 
     private final String name;
     private final ArgumentType<?> brigadierType;
-    private final BiFunction<Object, CommandContext<?>, T> extractor;
+    private final BiFunction<Object, com.mojang.brigadier.context.CommandContext<?>, T> extractor;
     private SuggestionProvider<?> suggestionProvider;
 
     public Argument(String name, ArgumentType<?> brigadierType,
-                    BiFunction<Object, CommandContext<?>, T> extractor) {
+                    BiFunction<Object, com.mojang.brigadier.context.CommandContext<?>, T> extractor) {
         this.name = name;
         this.brigadierType = brigadierType;
         this.extractor = extractor;
@@ -46,9 +46,9 @@ public final class Argument<T> {
         return this;
     }
 
-    public Argument<T> suggests(@NonNull Function<dev.oum.oumlib.command.CommandContext, Collection<String>> provider) {
+    public Argument<T> suggests(@NonNull Function<CommandContext, Collection<String>> provider) {
         this.suggestionProvider = (ctx, builder) -> {
-            var oumCtx = dev.oum.oumlib.command.CommandContext.fromBrigadier(ctx);
+            var oumCtx = CommandContext.fromBrigadier(ctx);
             for (String s : provider.apply(oumCtx)) {
                 builder.suggest(s);
             }
@@ -57,9 +57,25 @@ public final class Argument<T> {
         return this;
     }
 
-    public Argument<T> suggestsAsync(@NonNull Function<dev.oum.oumlib.command.CommandContext, CompletableFuture<Collection<String>>> provider) {
+    public Argument<T> suggestsRich(@NonNull Function<CommandContext, Collection<RichSuggestion>> provider) {
         this.suggestionProvider = (ctx, builder) -> {
-            var oumCtx = dev.oum.oumlib.command.CommandContext.fromBrigadier(ctx);
+            var oumCtx = CommandContext.fromBrigadier(ctx);
+            for (RichSuggestion s : provider.apply(oumCtx)) {
+                if (s.tooltip() != null) {
+                    Message tooltipMsg = s::tooltip;
+                    builder.suggest(s.value(), tooltipMsg);
+                } else {
+                    builder.suggest(s.value());
+                }
+            }
+            return builder.buildFuture();
+        };
+        return this;
+    }
+
+    public Argument<T> suggestsAsync(@NonNull Function<CommandContext, CompletableFuture<Collection<String>>> provider) {
+        this.suggestionProvider = (ctx, builder) -> {
+            var oumCtx = CommandContext.fromBrigadier(ctx);
             return provider.apply(oumCtx).thenApply(suggestions -> {
                 for (String s : suggestions) {
                     builder.suggest(s);
@@ -71,12 +87,12 @@ public final class Argument<T> {
     }
 
     public Argument<T> suggestsCached(
-            @NonNull Function<dev.oum.oumlib.command.CommandContext, Collection<String>> provider,
+            @NonNull Function<CommandContext, Collection<String>> provider,
             @NonNull Duration cacheDuration
     ) {
         final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
         this.suggestionProvider = (ctx, builder) -> {
-            var oumCtx = dev.oum.oumlib.command.CommandContext.fromBrigadier(ctx);
+            var oumCtx = CommandContext.fromBrigadier(ctx);
             String cacheKey = oumCtx.sender().toString();
             long now = System.currentTimeMillis();
             CacheEntry entry = cache.get(cacheKey);
@@ -97,12 +113,12 @@ public final class Argument<T> {
     }
 
     public Argument<T> suggestsCachedAsync(
-            @NonNull Function<dev.oum.oumlib.command.CommandContext, CompletableFuture<Collection<String>>> provider,
+            @NonNull Function<CommandContext, CompletableFuture<Collection<String>>> provider,
             @NonNull Duration cacheDuration
     ) {
         final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
         this.suggestionProvider = (ctx, builder) -> {
-            var oumCtx = dev.oum.oumlib.command.CommandContext.fromBrigadier(ctx);
+            var oumCtx = CommandContext.fromBrigadier(ctx);
             String cacheKey = oumCtx.sender().toString();
             long now = System.currentTimeMillis();
             CacheEntry entry = cache.get(cacheKey);
@@ -125,7 +141,7 @@ public final class Argument<T> {
 
     public Argument<T> suggestsVelocitySpigot(@NonNull String queryType) {
         this.suggestionProvider = (ctx, builder) -> {
-            var oumCtx = dev.oum.oumlib.command.CommandContext.fromBrigadier(ctx);
+            var oumCtx = CommandContext.fromBrigadier(ctx);
             if (!oumCtx.isPlayer()) {
                 return builder.buildFuture();
             }
@@ -175,7 +191,7 @@ public final class Argument<T> {
         return brigadierType;
     }
 
-    public BiFunction<Object, CommandContext<?>, T> extractor() {
+    public BiFunction<Object, com.mojang.brigadier.context.CommandContext<?>, T> extractor() {
         return extractor;
     }
 

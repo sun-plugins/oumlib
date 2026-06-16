@@ -5,8 +5,12 @@ import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
+import net.kyori.adventure.title.Title;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+
+import java.time.Duration;
 
 public record CommandContext(
         Object source,
@@ -113,5 +117,57 @@ public record CommandContext(
 
     public void sendTranslated(@NonNull String key, TagResolver... resolvers) {
         sender.sendMessage(Localization.translateFor(sender, key, resolvers));
+    }
+
+    public void sendActionBar(@NonNull Component component) {
+        sender.sendActionBar(component);
+    }
+
+    public void sendActionBar(@NonNull String miniMessage, TagResolver... resolvers) {
+        sender.sendActionBar(MiniMessage.miniMessage().deserialize(miniMessage, resolvers));
+    }
+
+    public void sendTitle(@NonNull Component title, @NonNull Component subtitle) {
+        sender.showTitle(Title.title(title, subtitle));
+    }
+
+    public void sendTitle(@NonNull Component title, @NonNull Component subtitle, Title.@Nullable Times times) {
+        sender.showTitle(Title.title(title, subtitle, times));
+    }
+
+    public void sendTitle(@NonNull String title, @NonNull String subtitle, TagResolver... resolvers) {
+        var mm = MiniMessage.miniMessage();
+        sender.showTitle(Title.title(
+                mm.deserialize(title, resolvers),
+                mm.deserialize(subtitle, resolvers)
+        ));
+    }
+
+    public void sendTitle(
+            @NonNull String title,
+            @NonNull String subtitle,
+            @Nullable Duration fadeIn,
+            @Nullable Duration stay,
+            @Nullable Duration fadeOut,
+            TagResolver... resolvers
+    ) {
+        var mm = MiniMessage.miniMessage();
+        Title.Times times = null;
+        if (fadeIn != null || stay != null || fadeOut != null) {
+            times = Title.Times.times(
+                    fadeIn != null ? fadeIn : Duration.ZERO,
+                    stay != null ? stay : Duration.ZERO,
+                    fadeOut != null ? fadeOut : Duration.ZERO
+            );
+        }
+        sender.showTitle(Title.title(
+                mm.deserialize(title, resolvers),
+                mm.deserialize(subtitle, resolvers),
+                times
+        ));
+    }
+
+    public void clearTitle() {
+        sender.clearTitle();
     }
 }

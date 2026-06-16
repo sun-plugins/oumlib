@@ -32,7 +32,7 @@ public final class PapiPlaceholderBridge extends PlaceholderExpansion {
 
     @Override
     public @NotNull String getAuthor() {
-        return plugin.getPluginMeta().getAuthors().stream().findFirst().orElse("Unknown");
+        return plugin.getPluginMeta().getAuthors().stream().findFirst().orElse("sun-dev");
     }
 
     @Override

@@ -5,6 +5,7 @@ import com.velocitypowered.api.event.connection.PluginMessageEvent;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
 import dev.oum.oumlib.command.Argument;
+import dev.oum.oumlib.command.CommandContext;
 import dev.oum.oumlib.event.EventBus;
 import dev.oum.oumlib.event.platform.PaperEventBus;
 import dev.oum.oumlib.event.platform.VelocityEventBus;
@@ -18,6 +19,7 @@ import dev.oum.oumlib.text.placeholder.PlaceholderRegistry;
 import dev.oum.oumlib.text.placeholder.bridge.MiniPlaceholdersHelper;
 import dev.oum.oumlib.text.placeholder.bridge.PapiHelper;
 import net.kyori.adventure.audience.Audience;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -25,15 +27,12 @@ import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -47,6 +46,11 @@ public final class OumLib {
     private static PlaceholderRegistry placeholderRegistry;
     private static boolean initialized;
     private static boolean debugMode = false;
+    private static BiConsumer<CommandContext, Throwable> commandErrorHandler = (context, ex) -> {
+        OumLib.logError("Error executing command /" + context.label(), ex);
+        context.sender().sendMessage(MiniMessage.miniMessage()
+                .deserialize("<red>An unexpected error occurred while executing this command.</red>"));
+    };
 
     private OumLib() {
     }
@@ -284,6 +288,10 @@ public final class OumLib {
         }
     }
 
+    public static BiConsumer<CommandContext, Throwable> commandErrorHandler() {
+        return commandErrorHandler;
+    }
+
     private static void assertInit() {
         if (!initialized) throw new IllegalStateException("Call OumLib.init(plugin) first.");
     }
@@ -291,6 +299,11 @@ public final class OumLib {
     public static final class InitBuilder {
         public InitBuilder preset(Preset type, String prefix) {
             presetRegistry.register(type, prefix);
+            return this;
+        }
+
+        public InitBuilder commandErrorHandler(BiConsumer<CommandContext, Throwable> handler) {
+            commandErrorHandler = handler;
             return this;
         }
     }

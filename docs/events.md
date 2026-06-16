@@ -61,19 +61,31 @@ Events.listen(BlockBreakEvent.class)
 
 ## 4. Automatic Unregistration & Memory Protection
 
-To avoid memory leaks, you can configure listeners to unregister themselves automatically when certain thresholds are reached:
+To avoid memory leaks, you can configure listeners to unregister themselves automatically when certain thresholds or conditions are reached:
 - **`maxFires(int count)`**: Automatically cleans up and unregisters the listener after it executes a set number of times.
 - **`expireAfter(Duration duration)`**: Automatically unregisters the listener after a set period of time has elapsed since registration.
+- **`expireIf(Predicate<E> condition)`**: Evaluates a custom condition on each event execution, unregistering the listener immediately if the predicate returns `true`.
 
 ```java
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import java.time.Duration;
 
+// 1. Fire-once or timed expiration
 Events.listen(PlayerQuitEvent.class)
     .maxFires(1) // Runs once, then cleans up. Perfect for single-event wait loops.
     .expireAfter(Duration.ofMinutes(10)) // Automatically unregisters after 10 minutes
     .handler(event -> {
         System.out.println("This message will print for at most one quit event within the next 10 minutes.");
+    });
+
+// 2. Conditional expiration (e.g. stop intercepting chat once user types 'exit')
+Events.listen(AsyncPlayerChatEvent.class)
+    .filter(event -> event.getPlayer().equals(targetPlayer))
+    .expireIf(event -> event.getMessage().equalsIgnoreCase("exit"))
+    .handler(event -> {
+        targetPlayer.sendMessage("Intercepted message: " + event.getMessage());
+        event.setCancelled(true);
     });
 ```
 
@@ -84,3 +96,14 @@ Events.listen(PlayerQuitEvent.class)
 - **Paper/Spigot**: Event handlers run synchronously on the server's main tick thread (the standard Bukkit behavior), unless the event itself is marked as asynchronous (e.g. `AsyncChatEvent`).
 - **Velocity**: Event handlers are run asynchronously on Netty thread pools. Velocity events do not run on a single main thread.
 - **Folia**: Folia runs events on the thread executing the region tick where the event occurred. Since region tick threads change dynamically, ensure any external data mutations triggered inside your handlers are thread-safe (e.g. using `ConcurrentHashMap` or thread-safe atomic variables).
+
+### Asynchronous Listener Support
+To execute listener code on a background thread pool (or virtual thread on Paper/Folia), chain `.async()` on the builder:
+```java
+Events.listen(PlayerInteractEvent.class)
+    .async() // Offloads execution to virtual/async threads
+    .handler(event -> {
+        // Safe to execute blocking database lookups or HTTP webhooks
+        // Note: Event modification/cancellation is not supported in async mode
+    });
+```

@@ -147,10 +147,28 @@ ItemStack item1 = ItemBuilder.of(Material.DIAMOND_SWORD)
     .customModelData(101) // Resource pack CustomModelData
     .build();
 
+// Use Adventure Components directly:
+ItemStack item2 = ItemBuilder.of(Material.DIAMOND_SWORD)
+    .name(Component.text("Custom Sword").color(NamedTextColor.GOLD))
+    .lore(List.of(Component.text("A custom lore line")))
+    .build();
+
 // Modify an existing item stack (Copy and Edit)
 ItemStack copied = ItemBuilder.of(item1)
     .type(Material.NETHERITE_SWORD) // Swaps material
     .addLore("Modified by system")  // Appends to existing lore
+    .build();
+
+// Store custom data in the item's Persistent Data Container (PDC)
+ItemStack itemWithPdc = ItemBuilder.of(Material.GOLD_INGOT)
+    .name("<gold>Treasure Ingot</gold>")
+    .pdc("key_string", "some-metadata")
+    .pdc("key_int", 42)
+    .pdc("key_double", 3.14)
+    .pdc("key_boolean", true)
+    // You can even serialize and store sub-items or lists of items inside this item's PDC:
+    .pdc("key_sub_item", new ItemStack(Material.APPLE))
+    .pdc("key_item_array", new ItemStack[]{ new ItemStack(Material.COOKIE) })
     .build();
 
 // Other utility methods:

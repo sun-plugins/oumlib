@@ -9,6 +9,7 @@ import org.jspecify.annotations.NonNull;
 import java.util.Locale;
 
 @SuppressWarnings("PatternValidation")
+@Deprecated(since = "1.0.5", forRemoval = true)
 public final class Sounds {
 
     private Sounds() {

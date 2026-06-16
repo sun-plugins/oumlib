@@ -14,10 +14,24 @@ import java.util.function.Consumer;
 public final class SubcommandBuilder {
 
     private final List<Argument<?>> arguments = new ArrayList<>();
+    private final List<String> aliases = new ArrayList<>();
     private String label;
     private String permission;
     private Permission permissionObject;
     private Consumer<CommandContext> executor;
+
+    @CheckReturnValue
+    public @NonNull SubcommandBuilder aliases(String @NonNull ... a) {
+        this.aliases.addAll(List.of(a));
+        return this;
+    }
+
+    @Contract(pure = true)
+    @NonNull
+    @Unmodifiable
+    public List<@NonNull String> aliases() {
+        return List.copyOf(aliases);
+    }
 
     @CheckReturnValue
     public @NonNull SubcommandBuilder label(@NonNull String label) {
@@ -26,6 +40,7 @@ public final class SubcommandBuilder {
     }
 
     @CheckReturnValue
+    @Deprecated(since = "1.0.5", forRemoval = false)
     public @NonNull SubcommandBuilder permission(@NonNull String permission) {
         this.permission = permission;
         return this;

@@ -3,6 +3,7 @@ package dev.oum.oumlib.inventory;
 import com.destroystokyo.paper.profile.PlayerProfile;
 import com.google.gson.Gson;
 import dev.oum.oumlib.OumLib;
+import dev.oum.oumlib.util.ItemSerializer;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
@@ -59,9 +60,21 @@ public final class ItemBuilder {
         return new ItemBuilder(item);
     }
 
+    @Contract("_, _, _ -> new")
+    @CheckReturnValue
+    public static @NonNull ItemStack quick(@NonNull Material material, @NonNull String miniMessageName, String @NonNull ... loreLines) {
+        return of(material).name(miniMessageName).lore(loreLines).build();
+    }
+
     @CheckReturnValue
     public @NonNull ItemBuilder name(@NonNull String miniMessage) {
         meta.displayName(MM.deserialize("<!italic>" + miniMessage));
+        return this;
+    }
+
+    @CheckReturnValue
+    public @NonNull ItemBuilder name(@Nullable Component component) {
+        meta.displayName(component);
         return this;
     }
 
@@ -70,6 +83,12 @@ public final class ItemBuilder {
         meta.lore(Arrays.stream(lines)
                 .map(l -> MM.deserialize("<!italic><gray>" + l))
                 .collect(Collectors.toList()));
+        return this;
+    }
+
+    @CheckReturnValue
+    public @NonNull ItemBuilder lore(@Nullable List<Component> lines) {
+        meta.lore(lines);
         return this;
     }
 
@@ -177,6 +196,28 @@ public final class ItemBuilder {
             meta.getPersistentDataContainer().remove(nsk);
         } else {
             meta.getPersistentDataContainer().set(nsk, PersistentDataType.STRING, GSON.toJson(value));
+        }
+        return this;
+    }
+
+    @CheckReturnValue
+    public @NonNull ItemBuilder pdc(@NonNull String key, @Nullable ItemStack value) {
+        NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
+        if (value == null) {
+            meta.getPersistentDataContainer().remove(nsk);
+        } else {
+            meta.getPersistentDataContainer().set(nsk, PersistentDataType.STRING, ItemSerializer.serialize(value));
+        }
+        return this;
+    }
+
+    @CheckReturnValue
+    public @NonNull ItemBuilder pdc(@NonNull String key, ItemStack @Nullable [] value) {
+        NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
+        if (value == null) {
+            meta.getPersistentDataContainer().remove(nsk);
+        } else {
+            meta.getPersistentDataContainer().set(nsk, PersistentDataType.STRING, ItemSerializer.serializeArray(value));
         }
         return this;
     }

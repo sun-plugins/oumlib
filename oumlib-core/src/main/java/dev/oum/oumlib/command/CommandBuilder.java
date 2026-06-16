@@ -11,6 +11,7 @@ import org.jspecify.annotations.Nullable;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -27,6 +28,7 @@ public final class CommandBuilder {
     private Consumer<CommandContext> executor;
     private Cooldown cooldown;
     private Predicate<CommandContext> cooldownBypass;
+    private BiConsumer<CommandContext, Throwable> exceptionHandler;
 
     private CommandBuilder(String label) {
         this.label = label;
@@ -51,6 +53,7 @@ public final class CommandBuilder {
     }
 
     @CheckReturnValue
+    @Deprecated(since = "1.0.5", forRemoval = false)
     public @NonNull CommandBuilder permission(@NonNull String permission) {
         this.permission = permission;
         return this;
@@ -167,5 +170,15 @@ public final class CommandBuilder {
 
     public @Nullable Cooldown cooldown() {
         return cooldown;
+    }
+
+    @CheckReturnValue
+    public @NonNull CommandBuilder onException(@NonNull BiConsumer<CommandContext, Throwable> handler) {
+        this.exceptionHandler = handler;
+        return this;
+    }
+
+    public @Nullable BiConsumer<CommandContext, Throwable> exceptionHandler() {
+        return exceptionHandler;
     }
 }

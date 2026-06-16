@@ -11,6 +11,7 @@ import org.jspecify.annotations.NonNull;
 
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicInteger;
+import dev.oum.oumlib.scheduler.Scheduler;
 
 public final class PaperEventBus implements EventBusAdapter {
 
@@ -75,10 +76,21 @@ public final class PaperEventBus implements EventBusAdapter {
                         if (!filter.test(e)) return;
                     }
 
-                    builder.handler().accept(e);
+                    Runnable task = () -> {
+                        if (!handle.isActive()) return;
+                        builder.handler().accept(e);
 
-                    if (builder.maxFires() > 0 && fireCount.incrementAndGet() >= builder.maxFires()) {
-                        handle.unregister();
+                        boolean shouldExpire = (builder.maxFires() > 0 && fireCount.incrementAndGet() >= builder.maxFires())
+                                || (builder.expireIf() != null && builder.expireIf().test(e));
+                        if (shouldExpire) {
+                            handle.unregister();
+                        }
+                    };
+
+                    if (builder.isAsync()) {
+                        Scheduler.runAsync(task);
+                    } else {
+                        task.run();
                     }
                 },
                 plugin,

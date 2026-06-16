@@ -8,22 +8,13 @@ import org.jetbrains.annotations.CheckReturnValue;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.RecordComponent;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Consumer;
 
 public final class Database {
@@ -110,6 +101,68 @@ public final class Database {
         return new Database(config);
     }
 
+    private static @Nullable Object getValueFromResultSet(@NonNull ResultSet rs, @NonNull String label,
+                                                          @NonNull Class<?> type) throws SQLException {
+        Object val = rs.getObject(label);
+        if (val == null) return null;
+        if (type == int.class || type == Integer.class) {
+            return rs.getInt(label);
+        } else if (type == double.class || type == Double.class) {
+            return rs.getDouble(label);
+        } else if (type == float.class || type == Float.class) {
+            return rs.getFloat(label);
+        } else if (type == long.class || type == Long.class) {
+            return rs.getLong(label);
+        } else if (type == boolean.class || type == Boolean.class) {
+            return rs.getBoolean(label);
+        } else if (type == String.class) {
+            return rs.getString(label);
+        }
+        return val;
+    }
+
+    private static @NonNull String toCamelCase(@NonNull String snake) {
+        StringBuilder sb = new StringBuilder();
+        boolean nextUpper = false;
+        for (int i = 0; i < snake.length(); i++) {
+            char c = snake.charAt(i);
+            if (c == '_') {
+                nextUpper = true;
+            } else {
+                if (nextUpper) {
+                    sb.append(Character.toUpperCase(c));
+                    nextUpper = false;
+                } else {
+                    sb.append(Character.toLowerCase(c));
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    private static int parseVersion(@NonNull String filename) {
+        try {
+            int underscoreIdx = filename.indexOf("__");
+            if (underscoreIdx != -1) {
+                return Integer.parseInt(filename.substring(1, underscoreIdx));
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        return -1;
+    }
+
+    private static @NonNull String parseDescription(@NonNull String filename) {
+        int underscoreIdx = filename.indexOf("__");
+        if (underscoreIdx != -1) {
+            String desc = filename.substring(underscoreIdx + 2);
+            if (desc.endsWith(".sql")) {
+                desc = desc.substring(0, desc.length() - 4);
+            }
+            return desc.replace('_', ' ');
+        }
+        return filename;
+    }
+
     public @NonNull Connection getConnection() throws SQLException {
         return dataSource.getConnection();
     }
@@ -124,12 +177,12 @@ public final class Database {
         return dataSource;
     }
 
-    public void setSlowQueryThresholdMs(long ms) {
-        this.slowQueryThresholdMs = ms;
-    }
-
     public long getSlowQueryThresholdMs() {
         return slowQueryThresholdMs;
+    }
+
+    public void setSlowQueryThresholdMs(long ms) {
+        this.slowQueryThresholdMs = ms;
     }
 
     @CheckReturnValue
@@ -258,45 +311,6 @@ public final class Database {
         }, params);
     }
 
-    private static @Nullable Object getValueFromResultSet(@NonNull ResultSet rs, @NonNull String label,
-                                                          @NonNull Class<?> type) throws SQLException {
-        Object val = rs.getObject(label);
-        if (val == null) return null;
-        if (type == int.class || type == Integer.class) {
-            return rs.getInt(label);
-        } else if (type == double.class || type == Double.class) {
-            return rs.getDouble(label);
-        } else if (type == float.class || type == Float.class) {
-            return rs.getFloat(label);
-        } else if (type == long.class || type == Long.class) {
-            return rs.getLong(label);
-        } else if (type == boolean.class || type == Boolean.class) {
-            return rs.getBoolean(label);
-        } else if (type == String.class) {
-            return rs.getString(label);
-        }
-        return val;
-    }
-
-    private static @NonNull String toCamelCase(@NonNull String snake) {
-        StringBuilder sb = new StringBuilder();
-        boolean nextUpper = false;
-        for (int i = 0; i < snake.length(); i++) {
-            char c = snake.charAt(i);
-            if (c == '_') {
-                nextUpper = true;
-            } else {
-                if (nextUpper) {
-                    sb.append(Character.toUpperCase(c));
-                    nextUpper = false;
-                } else {
-                    sb.append(Character.toLowerCase(c));
-                }
-            }
-        }
-        return sb.toString();
-    }
-
     @CheckReturnValue
     public @NonNull Promise<int[]> executeBatch(@NonNull String sql, @NonNull List<Object[]> parameterBatch) {
         return Promise.supplyVirtual(() -> {
@@ -322,6 +336,7 @@ public final class Database {
     }
 
     @CheckReturnValue
+    @Deprecated(since = "1.0.5", forRemoval = false)
     public <R> @NonNull Promise<R> transaction(@NonNull TransactionCallback<R> callback) {
         return Promise.supplyVirtual(() -> {
             long start = System.currentTimeMillis();
@@ -330,6 +345,41 @@ public final class Database {
                 try {
                     conn.setAutoCommit(false);
                     R result = callback.execute(conn);
+                    conn.commit();
+                    long elapsed = System.currentTimeMillis() - start;
+                    if (elapsed > slowQueryThresholdMs) {
+                        OumLib.logger().warning("SLOW TRANSACTION (" + elapsed + "ms)");
+                    }
+                    return result;
+                } catch (Throwable t) {
+                    try {
+                        conn.rollback();
+                    } catch (SQLException ex) {
+                        t.addSuppressed(ex);
+                    }
+                    throw t;
+                } finally {
+                    try {
+                        conn.setAutoCommit(wasAutoCommit);
+                    } catch (SQLException ignored) {
+                    }
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException("SQL transaction execution failed", e);
+            }
+        });
+    }
+
+    @CheckReturnValue
+    public <R> @NonNull Promise<R> transaction(@NonNull TransactionContextCallback<R> callback) {
+        return Promise.supplyVirtual(() -> {
+            long start = System.currentTimeMillis();
+            try (Connection conn = getConnection()) {
+                boolean wasAutoCommit = conn.getAutoCommit();
+                try {
+                    conn.setAutoCommit(false);
+                    TransactionContext ctx = new TransactionContext(conn, slowQueryThresholdMs);
+                    R result = callback.execute(ctx);
                     conn.commit();
                     long elapsed = System.currentTimeMillis() - start;
                     if (elapsed > slowQueryThresholdMs) {
@@ -459,28 +509,5 @@ public final class Database {
                 }
             }
         }
-    }
-
-    private static int parseVersion(@NonNull String filename) {
-        try {
-            int underscoreIdx = filename.indexOf("__");
-            if (underscoreIdx != -1) {
-                return Integer.parseInt(filename.substring(1, underscoreIdx));
-            }
-        } catch (NumberFormatException ignored) {
-        }
-        return -1;
-    }
-
-    private static @NonNull String parseDescription(@NonNull String filename) {
-        int underscoreIdx = filename.indexOf("__");
-        if (underscoreIdx != -1) {
-            String desc = filename.substring(underscoreIdx + 2);
-            if (desc.endsWith(".sql")) {
-                desc = desc.substring(0, desc.length() - 4);
-            }
-            return desc.replace('_', ' ');
-        }
-        return filename;
     }
 }

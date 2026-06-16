@@ -55,14 +55,10 @@ Add this `maven-shade-plugin` configuration to your plugin's `pom.xml`:
             <configuration>
                 <createDependencyReducedPom>false</createDependencyReducedPom>
                 <relocations>
-                    <!-- Relocate oumlib & hikari into your own plugin package -->
+                    <!-- Relocate oumlib into your own plugin package (nested dependencies like Hikari are already auto-relocated internally) -->
                     <relocation>
                         <pattern>dev.oum.oumlib</pattern>
                         <shadedPattern>your.plugin.package.libs.oumlib</shadedPattern>
-                    </relocation>
-                    <relocation>
-                        <pattern>com.zaxxer</pattern>
-                        <shadedPattern>your.plugin.package.libs.hikari</shadedPattern>
                     </relocation>
                 </relocations>
                 <filters>
@@ -108,9 +104,11 @@ ConfigManager<MyConfig> config = ConfigManager.of(MyConfig.class, "config.yml",
     () -> new MyConfig("<yellow>Default broadcast message!</yellow>")
 ).enableAutoReload();
 
-// 3. Register a command to open a GUI
+// 3. Declare permission and register a command to open a GUI
+Permission adminPermission = Permission.builder("myplugin.admin").build();
+
 Commands.literal("admin")
-    .permission("myplugin.admin")
+    .permission(adminPermission)
     .subcommand(sub -> sub
         .label("menu")
         .executes(context -> {
@@ -151,12 +149,12 @@ If you want to build the library yourself, or if you prefer to install it locall
    ```
 4. You can now reference the library in your local projects without declaring the JitPack repository:
    ```xml
-   <dependency>
-       <groupId>dev.oum</groupId>
-       <artifactId>oumlib-core</artifactId>
+    <dependency>
+        <groupId>dev.oum</groupId>
+        <artifactId>oumlib-core</artifactId>
        <version>VERSION</version>
-       <scope>compile</scope>
-   </dependency>
+        <scope>compile</scope>
+    </dependency>
    ```
 
 ---

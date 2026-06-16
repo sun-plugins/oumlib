@@ -102,11 +102,29 @@ db.executeBatch("INSERT INTO players (uuid, coins) VALUES (?, ?) ON DUPLICATE KE
 
 ## 5. Transactions
 
-Use `.transaction(TransactionCallback<R>)` to run multiple queries sequentially inside a transaction on a single connection. The wrapper automatically disables auto-commit, commits upon success, and rolls back if an exception occurs:
+Use `.transaction(TransactionContextCallback<R>)` (recommended) to execute multiple queries sequentially within a transaction context. This context exposes the same class-mapping and batch execution helpers as the main `Database` object, executing them synchronously on the active transaction connection.
 
+The wrapper automatically disables auto-commit, commits upon successful execution, and rolls back all operations if any error/exception is encountered.
+
+### High-level Transaction Context (Recommended):
+```java
+db.transaction(ctx -> {
+    // Both statements execute sequentially on the same active transaction connection
+    ctx.executeUpdate("UPDATE players SET coins = coins - 10 WHERE uuid = ?", playerUuid);
+    ctx.executeUpdate("INSERT INTO transactions (uuid, amount) VALUES (?, -10)", playerUuid);
+    
+    // You can retrieve values or maps inside the transaction too
+    return ctx.executeQuery("SELECT coins FROM players WHERE uuid = ?", Integer.class, playerUuid).getFirst();
+}).whenCompleteSync(
+    coins -> getLogger().info("Transaction committed. New balance: " + coins),
+    error -> getLogger().severe("Transaction failed and rolled back: " + error.getMessage())
+);
+```
+
+### Low-level Raw Connection Transaction (Optional):
+For direct JDBC operations, pass a `TransactionCallback<R>` to interact with the raw `Connection` object:
 ```java
 db.transaction(conn -> {
-    // Both statements execute sequentially on the same connection
     try (var stmt1 = conn.prepareStatement("UPDATE players SET coins = coins - 10 WHERE uuid = ?");
          var stmt2 = conn.prepareStatement("INSERT INTO transactions (uuid, amount) VALUES (?, -10)")) {
         
@@ -117,10 +135,7 @@ db.transaction(conn -> {
         stmt2.executeUpdate();
     }
     return null;
-}).whenCompleteSync(
-    success -> getLogger().info("Transaction committed successfully!"),
-    error -> getLogger().severe("Transaction failed and rolled back: " + error.getMessage())
-);
+});
 ```
 
 ---

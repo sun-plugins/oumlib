@@ -22,11 +22,6 @@ import java.util.function.Consumer;
 public final class Pdc {
 
     private static final Gson GSON = new Gson();
-
-    public interface PdcChangeListener {
-        void onChange(@NonNull Object target, @NonNull NamespacedKey key, @Nullable Object oldValue, @Nullable Object newValue);
-    }
-
     private static final Map<NamespacedKey, List<PdcChangeListener>> listeners = new ConcurrentHashMap<>();
 
     private Pdc() {
@@ -43,7 +38,8 @@ public final class Pdc {
         }
     }
 
-    private static void triggerListeners(@NonNull Object target, @NonNull NamespacedKey key, @Nullable Object oldValue, @Nullable Object newValue) {
+    private static void triggerListeners(@NonNull Object target, @NonNull NamespacedKey key,
+                                         @Nullable Object oldValue, @Nullable Object newValue) {
         List<PdcChangeListener> list = listeners.get(key);
         if (list != null) {
             for (PdcChangeListener listener : list) {
@@ -81,7 +77,7 @@ public final class Pdc {
     }
 
     @Deprecated(since = "1.0.4", forRemoval = true)
-    public static @Nullable Boolean getBoolean(@NonNull ItemStack item, @NonNull String key) {
+    public static @NonNull Boolean getBoolean(@NonNull ItemStack item, @NonNull String key) {
         return of(item).getBoolean(key);
     }
 
@@ -93,6 +89,11 @@ public final class Pdc {
     @Deprecated(since = "1.0.4", forRemoval = true)
     public static @Nullable List<String> getList(@NonNull ItemStack item, @NonNull String key) {
         return of(item).getList(key);
+    }
+
+    public interface PdcChangeListener {
+        void onChange(@NonNull Object target, @NonNull NamespacedKey key,
+                      @Nullable Object oldValue, @Nullable Object newValue);
     }
 
     public static final class PdcHolder {
@@ -320,6 +321,56 @@ public final class Pdc {
             return GSON.fromJson(raw, type);
         }
 
+        public @NonNull PdcHolder setItem(@NonNull String key, @Nullable ItemStack value) {
+            return setItem(nsk(key), value);
+        }
+
+        public @NonNull PdcHolder setItem(@NonNull NamespacedKey key, @Nullable ItemStack value) {
+            String oldValue = pdc.get(key, PersistentDataType.STRING);
+            if (value == null) {
+                pdc.remove(key);
+            } else {
+                pdc.set(key, PersistentDataType.STRING, ItemSerializer.serialize(value));
+            }
+            triggerListeners(holder, key, oldValue, value);
+            return this;
+        }
+
+        public @Nullable ItemStack getItem(@NonNull String key) {
+            return getItem(nsk(key));
+        }
+
+        public @Nullable ItemStack getItem(@NonNull NamespacedKey key) {
+            String base64 = pdc.get(key, PersistentDataType.STRING);
+            if (base64 == null) return null;
+            return ItemSerializer.deserialize(base64);
+        }
+
+        public @NonNull PdcHolder setItemArray(@NonNull String key, ItemStack @Nullable [] value) {
+            return setItemArray(nsk(key), value);
+        }
+
+        public @NonNull PdcHolder setItemArray(@NonNull NamespacedKey key, ItemStack @Nullable [] value) {
+            String oldValue = pdc.get(key, PersistentDataType.STRING);
+            if (value == null) {
+                pdc.remove(key);
+            } else {
+                pdc.set(key, PersistentDataType.STRING, ItemSerializer.serializeArray(value));
+            }
+            triggerListeners(holder, key, oldValue, value);
+            return this;
+        }
+
+        public ItemStack @Nullable [] getItemArray(@NonNull String key) {
+            return getItemArray(nsk(key));
+        }
+
+        public ItemStack @Nullable [] getItemArray(@NonNull NamespacedKey key) {
+            String base64 = pdc.get(key, PersistentDataType.STRING);
+            if (base64 == null) return null;
+            return ItemSerializer.deserializeArray(base64);
+        }
+
         public @NonNull PdcHolder remove(@NonNull String key) {
             return remove(nsk(key));
         }
@@ -366,12 +417,6 @@ public final class Pdc {
         }
 
         private boolean updateMeta(Consumer<ItemMeta> consumer) {
-            if (!item.hasItemMeta()) {
-                ItemMeta meta = item.getItemMeta();
-                if (meta == null) return false;
-                consumer.accept(meta);
-                return item.setItemMeta(meta);
-            }
             ItemMeta meta = item.getItemMeta();
             if (meta == null) return false;
             consumer.accept(meta);
@@ -599,6 +644,60 @@ public final class Pdc {
             String raw = get(key);
             if (raw == null) return null;
             return GSON.fromJson(raw, type);
+        }
+
+        public @NonNull PdcItem setItem(@NonNull String key, @Nullable ItemStack value) {
+            return setItem(nsk(key), value);
+        }
+
+        public @NonNull PdcItem setItem(@NonNull NamespacedKey key, @Nullable ItemStack value) {
+            Object oldValue = get(key);
+            updateMeta(meta -> {
+                if (value == null) {
+                    meta.getPersistentDataContainer().remove(key);
+                } else {
+                    meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, ItemSerializer.serialize(value));
+                }
+            });
+            triggerListeners(item, key, oldValue, value);
+            return this;
+        }
+
+        public @Nullable ItemStack getItem(@NonNull String key) {
+            return getItem(nsk(key));
+        }
+
+        public @Nullable ItemStack getItem(@NonNull NamespacedKey key) {
+            String base64 = get(key);
+            if (base64 == null) return null;
+            return ItemSerializer.deserialize(base64);
+        }
+
+        public @NonNull PdcItem setItemArray(@NonNull String key, ItemStack @Nullable [] value) {
+            return setItemArray(nsk(key), value);
+        }
+
+        public @NonNull PdcItem setItemArray(@NonNull NamespacedKey key, ItemStack @Nullable [] value) {
+            Object oldValue = get(key);
+            updateMeta(meta -> {
+                if (value == null) {
+                    meta.getPersistentDataContainer().remove(key);
+                } else {
+                    meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, ItemSerializer.serializeArray(value));
+                }
+            });
+            triggerListeners(item, key, oldValue, value);
+            return this;
+        }
+
+        public ItemStack @Nullable [] getItemArray(@NonNull String key) {
+            return getItemArray(nsk(key));
+        }
+
+        public ItemStack @Nullable [] getItemArray(@NonNull NamespacedKey key) {
+            String base64 = get(key);
+            if (base64 == null) return null;
+            return ItemSerializer.deserializeArray(base64);
         }
 
         public @NonNull PdcItem remove(@NonNull String key) {

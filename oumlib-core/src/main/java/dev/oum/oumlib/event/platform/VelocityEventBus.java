@@ -76,7 +76,9 @@ public final class VelocityEventBus implements EventBusAdapter {
 
                 builder.handler().accept(event);
 
-                if (builder.maxFires() > 0 && fireCount.incrementAndGet() >= builder.maxFires()) {
+                boolean shouldExpire = (builder.maxFires() > 0 && fireCount.incrementAndGet() >= builder.maxFires())
+                        || (builder.expireIf() != null && builder.expireIf().test(event));
+                if (shouldExpire) {
                     if (handle != null) handle.unregister();
                 }
             }

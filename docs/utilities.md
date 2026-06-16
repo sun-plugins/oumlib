@@ -61,7 +61,7 @@ Pdc.registerListener(key, (holder, k, oldValue, newValue) -> {
 ```
 
 > [!WARNING]
-> Legacy static methods like `Pdc.get(item, key)` or `Pdc.getInt(...)` are deprecated and scheduled for removal in `v1.0.6`. Please migrate to the fluent `Pdc.of(...)` API.
+> Legacy static methods like `Pdc.get(item, key)` or `Pdc.getInt(...)` are deprecated and scheduled for removal in `v1.0.5`. Please migrate to the fluent `Pdc.of(...)` API.
 
 ---
 
@@ -199,6 +199,48 @@ byte[] messagePayload = ...;
 Proxy.sendPluginMessage(player, "myplugin:sync", messagePayload);
 ```
 
+### Dynamic Server Registration & Unregistration
+Register or unregister backend Minecraft servers dynamically at runtime without restarting the proxy:
+```java
+// Register a new game server instance
+Proxy.registerServer("games-3", "192.168.1.15", 25568);
+
+// Unregister a server when it shuts down
+Proxy.unregisterServer("games-3");
+```
+
+### Async Online Status Check (Ping)
+Check if a backend server is online and accepting connections asynchronously:
+```java
+Proxy.isOnline("lobby-1").thenAccept(online -> {
+    if (online) {
+        player.sendMessage("Lobby-1 is online!");
+    }
+});
+```
+
+### Targeted Server Broadcasts
+Broadcast MiniMessage-formatted messages and titles directly to all players connected to a specific server:
+```java
+// Broadcast chat message
+Proxy.broadcastTo("games-1", "<green>A new match is starting in 10 seconds!</green>");
+
+// Broadcast title
+Proxy.sendTitleTo("games-1", "<red>Match Started</red>", "<gray>Good luck!</gray>");
+```
+
+### Smart Load Balancer
+Find the best server (the one online with the lowest player count) from a list of options:
+```java
+Proxy.getBestServer(List.of("lobby-1", "lobby-2", "lobby-3"))
+    .thenAccept(optServer -> {
+        optServer.ifPresent(server -> {
+            player.sendMessage("Connecting to best server: " + server.getServerInfo().getName());
+            player.createConnectionRequest(server).fireAndForget();
+        });
+    });
+```
+
 ---
 
 ## 7. Standalone Cooldowns
@@ -225,7 +267,7 @@ if (speedCooldown.isOnCooldown(player.getUniqueId())) {
 ## 8. PlayerData Persistence (Paper-only)
 
 > [!WARNING]
-> The `dev.oum.oumlib.util.PlayerData` helper wrapper is deprecated in `v1.0.1` and scheduled for removal in `v1.0.3`. Developers must migrate to the modern and unified `Pdc.of(player)` API.
+> The `dev.oum.oumlib.util.PlayerData` helper wrapper is deprecated in `v1.0.3` and scheduled for removal in `v1.0.9`. Developers must migrate to the modern and unified `Pdc.of(player)` API.
 
 ### Migration Example:
 ```java
@@ -261,3 +303,91 @@ if (adminPerm.has(sender)) {
     // Perform admin actions...
 }
 ```
+
+---
+
+## 10. Base64 Item Serializer
+
+OumLib features `ItemSerializer` to serialize and deserialize single `ItemStack` instances or `ItemStack[]` arrays to safe Base64 strings. It automatically uses component-aware modern Paper API serialization if running on Paper 1.20.6+, and falls back to standard object streams on legacy platforms.
+
+### Serializing a single item:
+```java
+import dev.oum.oumlib.util.ItemSerializer;
+import org.bukkit.inventory.ItemStack;
+
+ItemStack sword = ...;
+String base64 = ItemSerializer.serialize(sword);
+
+// Deserializing back:
+ItemStack restored = ItemSerializer.deserialize(base64);
+```
+
+### Serializing an array of items (e.g. inventories):
+```java
+ItemStack[] inventory = player.getInventory().getContents();
+String base64 = ItemSerializer.serializeArray(inventory);
+
+// Deserializing back:
+ItemStack[] restoredInventory = ItemSerializer.deserializeArray(base64);
+```
+
+### Fluent Persistent Data Container (PDC) Integration:
+You can read and write `ItemStack` and `ItemStack[]` values directly via `Pdc` helper objects without manual serialization:
+```java
+import dev.oum.oumlib.util.Pdc;
+
+// Store an item directly in the player's PDC
+Pdc.of(player).setItem("saved-sword", sword);
+
+// Retrieve the item later
+ItemStack restored = Pdc.of(player).getItem("saved-sword");
+
+// Store or retrieve an entire item array (e.g. vaults/inventories)
+Pdc.of(player).setItemArray("backpack", inventory);
+ItemStack[] restoredBackpack = Pdc.of(player).getItemArray("backpack");
+```
+
+---
+
+## 11. Fluent Effects & Particle Player
+
+OumLib features a builder-based effects system (`Effects`) to spawn particles and play sounds with volume, pitch, velocity, colors, and specific target groups fluently.
+
+### Spawning Particles:
+```java
+import dev.oum.oumlib.effect.Effects;
+import org.bukkit.Particle;
+import org.bukkit.Color;
+
+// Spawn standard particle at a location
+Effects.particle(Particle.HAPPY_VILLAGER)
+    .count(15)
+    .speed(0.1)
+    .offset(0.5, 0.5, 0.5)
+    .spawn(location);
+
+// Spawn a colorized dust particle
+Effects.particle(Particle.DUST)
+    .color(Color.RED, 1.2f)
+    .spawn(location);
+
+// Spawn particles only visible to a specific player
+Effects.particle(Particle.FLAME)
+    .spawn(player, location);
+```
+
+### Playing Sounds:
+```java
+import dev.oum.oumlib.effect.Effects;
+import org.bukkit.Sound;
+import org.bukkit.SoundCategory;
+
+// Play a sound with random pitch variance (e.g. 1.0 +/- 0.2)
+Effects.sound(Sound.ENTITY_EXPERIENCE_ORB_PICKUP)
+    .category(SoundCategory.PLAYERS)
+    .volume(0.8f)
+    .pitch(1.0f)
+    .pitchVariance(0.2f)
+    .play(player);
+```
+

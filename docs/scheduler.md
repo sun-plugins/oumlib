@@ -31,7 +31,7 @@ For operations that must interact with Bukkit/Paper API directly (like spawning 
 - **`Scheduler.runLater(long ticks, Runnable)`**: Schedules a task to execute after a specified amount of server ticks.
 
 > [!WARNING]
-> The method `Scheduler.runDelayed(...)` is deprecated in `v1.0.1` and scheduled for removal in `v1.0.9`. Developers must migrate to `Scheduler.runLater(...)`.
+> The method `Scheduler.runDelayed(...)` is deprecated in `v1.0.4` and scheduled for removal in `v1.0.9`. Developers must migrate to `Scheduler.runLater(...)`.
 
 ```java
 import dev.oum.oumlib.scheduler.Scheduler;

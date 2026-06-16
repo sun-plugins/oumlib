@@ -14,6 +14,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public final class VelocityCommandRegistrar implements CommandRegistrar {
@@ -41,16 +42,10 @@ public final class VelocityCommandRegistrar implements CommandRegistrar {
         }
 
         for (SubcommandBuilder sub : builder.subcommands()) {
-            var subLiteral = LiteralArgumentBuilder.<CommandSource>literal(sub.label());
-            if (sub.permissionObject() != null) {
-                Permission subPermObj = sub.permissionObject();
-                subLiteral.requires(subPermObj::has);
-            } else if (sub.permission() != null) {
-                String subPerm = sub.permission();
-                subLiteral.requires(source -> source.hasPermission(subPerm));
+            root.then(buildSubNode(sub, sub.label(), builder));
+            for (String alias : sub.aliases()) {
+                root.then(buildSubNode(sub, alias, builder));
             }
-            attachArguments(subLiteral, sub.arguments(), sub.executor(), builder);
-            root.then(subLiteral);
         }
 
         if (builder.executor() != null) {
@@ -58,6 +53,23 @@ public final class VelocityCommandRegistrar implements CommandRegistrar {
         }
 
         return root;
+    }
+
+    private @NonNull LiteralArgumentBuilder<CommandSource> buildSubNode(
+            @NonNull SubcommandBuilder sub,
+            @NonNull String label,
+            @NonNull CommandBuilder builder
+    ) {
+        var subLiteral = LiteralArgumentBuilder.<CommandSource>literal(label);
+        if (sub.permissionObject() != null) {
+            Permission subPermObj = sub.permissionObject();
+            subLiteral.requires(subPermObj::has);
+        } else if (sub.permission() != null) {
+            String subPerm = sub.permission();
+            subLiteral.requires(source -> source.hasPermission(subPerm));
+        }
+        attachArguments(subLiteral, sub.arguments(), sub.executor(), builder);
+        return subLiteral;
     }
 
     private void attachArguments(
@@ -135,6 +147,17 @@ public final class VelocityCommandRegistrar implements CommandRegistrar {
             }
             builder.cooldown().set(player.getUniqueId());
         }
-        exec.accept(context);
+        try {
+            exec.accept(context);
+        } catch (Throwable ex) {
+            BiConsumer<CommandContext, Throwable> handler = builder.exceptionHandler() != null
+                    ? builder.exceptionHandler()
+                    : OumLib.commandErrorHandler();
+            if (handler != null) {
+                handler.accept(context, ex);
+            } else {
+                OumLib.logError("Unhandled exception executing command /" + builder.label(), ex);
+            }
+        }
     }
 }
