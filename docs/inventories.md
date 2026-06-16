@@ -237,3 +237,44 @@ PaginatedMenu menu = PaginatedMenu.builder()
 // Open the menu for a player
 menu.open(player);
 ```
+
+---
+
+## 8. ItemBuilder Reference
+
+`ItemBuilder` provides a fluent, modern builder API to create and format `ItemStack` display names and lores using Adventure components or MiniMessage templates:
+
+```java
+import dev.oum.oumlib.inventory.ItemBuilder;
+import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
+import net.kyori.adventure.text.Component;
+import java.util.List;
+
+// 1. Build a formatted item using MiniMessage and String lore:
+ItemStack sword = ItemBuilder.of(Material.DIAMOND_SWORD)
+    .name("<gold>Sword of Destiny</gold>")
+    .lore(
+        "<gray>An ancient blade forged in</gray>",
+        "<gray>the fires of Oum.</gray>"
+    )
+    .glow()
+    .build();
+
+// 2. Build using adventure components directly:
+Component name = Component.text("Special Item");
+List<Component> lore = List.of(Component.text("Lore line 1"));
+
+ItemStack custom = ItemBuilder.of(Material.GOLDEN_APPLE)
+    .name(name)
+    .lore(lore)
+    .build();
+
+// 3. Quick-build formatted items in one statement:
+ItemStack quickItem = ItemBuilder.quick(
+    Material.NETHERITE_INGOT,
+    "<red>Netherite Alloy</red>",
+    "<gray>High-grade metal used</gray>",
+    "<gray>for crafting gear.</gray>"
+);
+```
