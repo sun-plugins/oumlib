@@ -13,11 +13,33 @@ import java.util.concurrent.CompletableFuture;
 public final class PermissionBridge {
 
     private static Object luckPerms;
+    private static Class<?> luckPermsClass;
+    private static Class<?> userManagerClass;
+    private static Class<?> userClass;
+    private static Class<?> cachedDataClass;
+    private static Class<?> cachedMetaDataClass;
+    private static Class<?> nodeMapClass;
+    private static Class<?> nodeTypeClass;
+    private static Class<?> nodeClass;
+    private static Class<?> nodeBuilderClass;
+    private static Class<?> inheritanceNodeClass;
 
     static {
         try {
             Class<?> provider = Class.forName("net.luckperms.api.LuckPermsProvider");
             luckPerms = provider.getMethod("get").invoke(null);
+            if (luckPerms != null) {
+                luckPermsClass = Class.forName("net.luckperms.api.LuckPerms");
+                userManagerClass = Class.forName("net.luckperms.api.model.user.UserManager");
+                userClass = Class.forName("net.luckperms.api.model.user.User");
+                cachedDataClass = Class.forName("net.luckperms.api.cacheddata.CachedData");
+                cachedMetaDataClass = Class.forName("net.luckperms.api.cacheddata.CachedMetaData");
+                nodeMapClass = Class.forName("net.luckperms.api.node.NodeMap");
+                nodeTypeClass = Class.forName("net.luckperms.api.node.NodeType");
+                nodeClass = Class.forName("net.luckperms.api.node.Node");
+                nodeBuilderClass = Class.forName("net.luckperms.api.node.NodeBuilder");
+                inheritanceNodeClass = Class.forName("net.luckperms.api.node.types.InheritanceNode");
+            }
         } catch (Throwable ignored) {
         }
     }
@@ -32,10 +54,10 @@ public final class PermissionBridge {
     public static @Nullable String getPrimaryGroup(@NonNull UUID uuid) {
         if (luckPerms == null) return null;
         try {
-            Object userManager = luckPerms.getClass().getMethod("getUserManager").invoke(luckPerms);
-            Object user = userManager.getClass().getMethod("getUser", UUID.class).invoke(userManager, uuid);
+            Object userManager = luckPermsClass.getMethod("getUserManager").invoke(luckPerms);
+            Object user = userManagerClass.getMethod("getUser", UUID.class).invoke(userManager, uuid);
             if (user == null) return null;
-            return (String) user.getClass().getMethod("getPrimaryGroup").invoke(user);
+            return (String) userClass.getMethod("getPrimaryGroup").invoke(user);
         } catch (Exception ignored) {
         }
         return null;
@@ -44,12 +66,12 @@ public final class PermissionBridge {
     public static @Nullable String getPrefix(@NonNull UUID uuid) {
         if (luckPerms == null) return null;
         try {
-            Object userManager = luckPerms.getClass().getMethod("getUserManager").invoke(luckPerms);
-            Object user = userManager.getClass().getMethod("getUser", UUID.class).invoke(userManager, uuid);
+            Object userManager = luckPermsClass.getMethod("getUserManager").invoke(luckPerms);
+            Object user = userManagerClass.getMethod("getUser", UUID.class).invoke(userManager, uuid);
             if (user == null) return null;
-            Object cachedData = user.getClass().getMethod("getCachedData").invoke(user);
-            Object metaData = cachedData.getClass().getMethod("getMetaData").invoke(cachedData);
-            return (String) metaData.getClass().getMethod("getPrefix").invoke(metaData);
+            Object cachedData = userClass.getMethod("getCachedData").invoke(user);
+            Object metaData = cachedDataClass.getMethod("getMetaData").invoke(cachedData);
+            return (String) cachedMetaDataClass.getMethod("getPrefix").invoke(metaData);
         } catch (Exception ignored) {
         }
         return null;
@@ -58,12 +80,12 @@ public final class PermissionBridge {
     public static @Nullable String getSuffix(@NonNull UUID uuid) {
         if (luckPerms == null) return null;
         try {
-            Object userManager = luckPerms.getClass().getMethod("getUserManager").invoke(luckPerms);
-            Object user = userManager.getClass().getMethod("getUser", UUID.class).invoke(userManager, uuid);
+            Object userManager = luckPermsClass.getMethod("getUserManager").invoke(luckPerms);
+            Object user = userManagerClass.getMethod("getUser", UUID.class).invoke(userManager, uuid);
             if (user == null) return null;
-            Object cachedData = user.getClass().getMethod("getCachedData").invoke(user);
-            Object metaData = cachedData.getClass().getMethod("getMetaData").invoke(cachedData);
-            return (String) metaData.getClass().getMethod("getSuffix").invoke(metaData);
+            Object cachedData = userClass.getMethod("getCachedData").invoke(user);
+            Object metaData = cachedDataClass.getMethod("getMetaData").invoke(cachedData);
+            return (String) cachedMetaDataClass.getMethod("getSuffix").invoke(metaData);
         } catch (Exception ignored) {
         }
         return null;
@@ -72,12 +94,12 @@ public final class PermissionBridge {
     public static @Nullable String getMetaValue(@NonNull UUID uuid, @NonNull String key) {
         if (luckPerms == null) return null;
         try {
-            Object userManager = luckPerms.getClass().getMethod("getUserManager").invoke(luckPerms);
-            Object user = userManager.getClass().getMethod("getUser", UUID.class).invoke(userManager, uuid);
+            Object userManager = luckPermsClass.getMethod("getUserManager").invoke(luckPerms);
+            Object user = userManagerClass.getMethod("getUser", UUID.class).invoke(userManager, uuid);
             if (user == null) return null;
-            Object cachedData = user.getClass().getMethod("getCachedData").invoke(user);
-            Object metaData = cachedData.getClass().getMethod("getMetaData").invoke(cachedData);
-            return (String) metaData.getClass().getMethod("getMetaValue", String.class).invoke(metaData, key);
+            Object cachedData = userClass.getMethod("getCachedData").invoke(user);
+            Object metaData = cachedDataClass.getMethod("getMetaData").invoke(cachedData);
+            return (String) cachedMetaDataClass.getMethod("getMetaValue", String.class).invoke(metaData, key);
         } catch (Exception ignored) {
         }
         return null;
@@ -86,12 +108,11 @@ public final class PermissionBridge {
     public static @Nullable List<String> getGroups(@NonNull UUID uuid) {
         if (luckPerms == null) return null;
         try {
-            Object userManager = luckPerms.getClass().getMethod("getUserManager").invoke(luckPerms);
-            Object user = userManager.getClass().getMethod("getUser", UUID.class).invoke(userManager, uuid);
+            Object userManager = luckPermsClass.getMethod("getUserManager").invoke(luckPerms);
+            Object user = userManagerClass.getMethod("getUser", UUID.class).invoke(userManager, uuid);
             if (user == null) return null;
             List<String> groups = new ArrayList<>();
-            Collection<?> nodes = (Collection<?>) user.getClass().getMethod("getNodes").invoke(user);
-            Class<?> inheritanceNodeClass = Class.forName("net.luckperms.api.node.types.InheritanceNode");
+            Collection<?> nodes = (Collection<?>) userClass.getMethod("getNodes").invoke(user);
             Method getGroupNameMethod = inheritanceNodeClass.getMethod("getGroupName");
             for (Object node : nodes) {
                 if (inheritanceNodeClass.isInstance(node)) {
@@ -107,38 +128,33 @@ public final class PermissionBridge {
     public static void setGroups(@NonNull UUID uuid, @NonNull List<String> groups, @Nullable String primaryGroup) {
         if (luckPerms == null) return;
         try {
-            Object userManager = luckPerms.getClass().getMethod("getUserManager").invoke(luckPerms);
-            CompletableFuture<?> future = (CompletableFuture<?>) userManager.getClass()
+            Object userManager = luckPermsClass.getMethod("getUserManager").invoke(luckPerms);
+            CompletableFuture<?> future = (CompletableFuture<?>) userManagerClass
                     .getMethod("loadUser", UUID.class)
                     .invoke(userManager, uuid);
 
             future.thenAcceptAsync(user -> {
                 try {
-                    Object data = user.getClass().getMethod("data").invoke(user);
-
-                    Class<?> nodeTypeClass = Class.forName("net.luckperms.api.node.NodeType");
+                    Object data = userClass.getMethod("data").invoke(user);
                     Object inheritanceType = nodeTypeClass.getField("INHERITANCE").get(null);
 
-                    data.getClass().getMethod("clear", nodeTypeClass).invoke(data, inheritanceType);
+                    nodeMapClass.getMethod("clear", nodeTypeClass).invoke(data, inheritanceType);
 
-                    Class<?> inheritanceNodeClass = Class.forName("net.luckperms.api.node.types.InheritanceNode");
                     Method builderMethod = inheritanceNodeClass.getMethod("builder", String.class);
-
-                    Class<?> nodeClass = Class.forName("net.luckperms.api.node.Node");
-                    Method addMethod = data.getClass().getMethod("add", nodeClass);
+                    Method addMethod = nodeMapClass.getMethod("add", nodeClass);
+                    Method buildMethod = nodeBuilderClass.getMethod("build");
 
                     for (String group : groups) {
                         Object builder = builderMethod.invoke(null, group);
-                        Object node = builder.getClass().getMethod("build").invoke(builder);
+                        Object node = buildMethod.invoke(builder);
                         addMethod.invoke(data, node);
                     }
 
                     if (primaryGroup != null) {
-                        user.getClass().getMethod("setPrimaryGroup", String.class).invoke(user, primaryGroup);
+                        userClass.getMethod("setPrimaryGroup", String.class).invoke(user, primaryGroup);
                     }
 
-                    Class<?> userClass = Class.forName("net.luckperms.api.model.user.User");
-                    userManager.getClass().getMethod("saveUser", userClass).invoke(userManager, user);
+                    userManagerClass.getMethod("saveUser", userClass).invoke(userManager, user);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
