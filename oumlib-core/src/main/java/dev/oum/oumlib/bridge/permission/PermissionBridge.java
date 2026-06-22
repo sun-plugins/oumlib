@@ -1,5 +1,6 @@
 package dev.oum.oumlib.bridge.permission;
 
+import dev.oum.oumlib.OumLib;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.model.user.User;
