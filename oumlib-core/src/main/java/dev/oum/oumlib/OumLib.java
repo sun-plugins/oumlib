@@ -125,20 +125,7 @@ public final class OumLib {
             String queryType = dis.readUTF();
             String remaining = dis.readUTF();
 
-            List<String> suggestions = new ArrayList<>();
-            if (queryType.equalsIgnoreCase("worlds")) {
-                for (World w : Bukkit.getWorlds()) {
-                    if (w.getName().toLowerCase(Locale.ROOT).startsWith(remaining.toLowerCase(Locale.ROOT))) {
-                        suggestions.add(w.getName());
-                    }
-                }
-            } else if (queryType.equalsIgnoreCase("players")) {
-                for (Player p : Bukkit.getOnlinePlayers()) {
-                    if (p.getName().toLowerCase(Locale.ROOT).startsWith(remaining.toLowerCase(Locale.ROOT))) {
-                        suggestions.add(p.getName());
-                    }
-                }
-            }
+            List<String> suggestions = getSuggestions(queryType, remaining);
 
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             DataOutputStream dos = new DataOutputStream(baos);
@@ -150,6 +137,24 @@ public final class OumLib {
             player.sendPluginMessage(plugin, "oumlib:autocomplete", baos.toByteArray());
         } catch (Exception ignored) {
         }
+    }
+
+    private static @NonNull List<String> getSuggestions(@NonNull String queryType, String remaining) {
+        List<String> suggestions = new ArrayList<>();
+        if (queryType.equalsIgnoreCase("worlds")) {
+            for (World w : Bukkit.getWorlds()) {
+                if (w.getName().toLowerCase(Locale.ROOT).startsWith(remaining.toLowerCase(Locale.ROOT))) {
+                    suggestions.add(w.getName());
+                }
+            }
+        } else if (queryType.equalsIgnoreCase("players")) {
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                if (p.getName().toLowerCase(Locale.ROOT).startsWith(remaining.toLowerCase(Locale.ROOT))) {
+                    suggestions.add(p.getName());
+                }
+            }
+        }
+        return suggestions;
     }
 
     private static void detectIntegrations(@NonNull Plugin p) {
@@ -193,6 +198,14 @@ public final class OumLib {
         if (velocityPlugin == null)
             throw new IllegalStateException("Velocity plugin instance is only available on Velocity platform.");
         return velocityPlugin;
+    }
+
+    public static boolean isPaper() {
+        return plugin != null;
+    }
+
+    public static boolean isVelocity() {
+        return proxyServer != null;
     }
 
     public static @NonNull File getDataFolder() {

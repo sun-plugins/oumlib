@@ -95,6 +95,7 @@ public final class ItemSerializer {
         }
     }
 
+    @SuppressWarnings("deprecation")
     private static byte[] serializeToBytes(@NonNull ItemStack item) throws Exception {
         if (paperBytesSupported) {
             return (byte[]) serializeAsBytesMethod.invoke(item);
@@ -106,6 +107,7 @@ public final class ItemSerializer {
         }
     }
 
+    @SuppressWarnings("deprecation")
     private static @NonNull ItemStack deserializeFromBytes(byte @NonNull [] bytes) throws Exception {
         if (paperBytesSupported) {
             return (ItemStack) deserializeBytesMethod.invoke(null, (Object) bytes);

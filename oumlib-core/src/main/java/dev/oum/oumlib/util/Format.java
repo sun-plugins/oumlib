@@ -12,6 +12,8 @@ public final class Format {
 
     private static final DecimalFormat NUMBER_FORMAT = new DecimalFormat("#,###.##");
     private static final String[] SUFFIXES = {"", "k", "M", "B", "T"};
+    private static final int[] ROMAN_VALUES = {1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1};
+    private static final String[] ROMAN_SYMBOLS = {"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"};
 
     private Format() {
     }
@@ -82,5 +84,38 @@ public final class Format {
             }
         }
         return Duration.ofSeconds(totalSeconds);
+    }
+
+    public static @NonNull String percentage(double value, double max) {
+        if (max <= 0) return "0.0%";
+        double pct = (value / max) * 100.0;
+        return String.format(Locale.ROOT, "%.1f%%", pct);
+    }
+
+    public static @NonNull String roman(int number) {
+        if (number <= 0) return "";
+        StringBuilder sb = new StringBuilder();
+        int remaining = number;
+        for (int i = 0; i < ROMAN_VALUES.length; i++) {
+            while (remaining >= ROMAN_VALUES[i]) {
+                sb.append(ROMAN_SYMBOLS[i]);
+                remaining -= ROMAN_VALUES[i];
+            }
+        }
+        return sb.toString();
+    }
+
+    public static @NonNull String ordinal(int number) {
+        int mod100 = number % 100;
+        int mod10 = number % 10;
+        if (mod100 >= 11 && mod100 <= 13) {
+            return number + "th";
+        }
+        return switch (mod10) {
+            case 1 -> number + "st";
+            case 2 -> number + "nd";
+            case 3 -> number + "rd";
+            default -> number + "th";
+        };
     }
 }

@@ -61,36 +61,6 @@ public final class Pdc {
         return new PdcItem(item);
     }
 
-    @Deprecated(since = "1.0.4", forRemoval = true)
-    public static @Nullable String get(@NonNull ItemStack item, @NonNull String key) {
-        return of(item).get(key);
-    }
-
-    @Deprecated(since = "1.0.4", forRemoval = true)
-    public static @Nullable Integer getInt(@NonNull ItemStack item, @NonNull String key) {
-        return of(item).getInt(key);
-    }
-
-    @Deprecated(since = "1.0.4", forRemoval = true)
-    public static @Nullable Double getDouble(@NonNull ItemStack item, @NonNull String key) {
-        return of(item).getDouble(key);
-    }
-
-    @Deprecated(since = "1.0.4", forRemoval = true)
-    public static @NonNull Boolean getBoolean(@NonNull ItemStack item, @NonNull String key) {
-        return of(item).getBoolean(key);
-    }
-
-    @Deprecated(since = "1.0.4", forRemoval = true)
-    public static @Nullable Long getLong(@NonNull ItemStack item, @NonNull String key) {
-        return of(item).getLong(key);
-    }
-
-    @Deprecated(since = "1.0.4", forRemoval = true)
-    public static @Nullable List<String> getList(@NonNull ItemStack item, @NonNull String key) {
-        return of(item).getList(key);
-    }
-
     public interface PdcChangeListener {
         void onChange(@NonNull Object target, @NonNull NamespacedKey key,
                       @Nullable Object oldValue, @Nullable Object newValue);

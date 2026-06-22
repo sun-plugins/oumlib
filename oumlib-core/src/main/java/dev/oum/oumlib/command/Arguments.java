@@ -1,14 +1,11 @@
 package dev.oum.oumlib.command;
 
-import com.mojang.brigadier.arguments.BoolArgumentType;
-import com.mojang.brigadier.arguments.DoubleArgumentType;
-import com.mojang.brigadier.arguments.FloatArgumentType;
-import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.brigadier.arguments.LongArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.arguments.*;
 import dev.oum.oumlib.OumLib;
 import dev.oum.oumlib.util.Format;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 
@@ -67,7 +64,14 @@ public final class Arguments {
                     .invoke(null, name);
         } catch (Exception ignored) {
         }
-
+        try {
+            Class.forName("org.bukkit.Bukkit");
+            return new Argument<>(name, StringArgumentType.word(), (raw, ctx) -> {
+                String nameStr = (String) raw;
+                return Bukkit.getPlayer(nameStr);
+            });
+        } catch (Exception ignored) {
+        }
         return new Argument<>(name, StringArgumentType.word(), (raw, ctx) -> {
             String nameStr = (String) raw;
             return OumLib.proxy().getPlayer(nameStr).orElse(null);
@@ -105,6 +109,15 @@ public final class Arguments {
             return (Argument<?>) Class.forName("dev.oum.oumlib.command.platform.PaperCommandHelper")
                     .getDeclaredMethod("createPlayersArgument", String.class)
                     .invoke(null, name);
+        } catch (Exception ignored) {
+        }
+        try {
+            Class.forName("org.bukkit.Bukkit");
+            return new Argument<>(name, StringArgumentType.word(), (raw, ctx) -> {
+                String nameStr = (String) raw;
+                var player = Bukkit.getPlayer(nameStr);
+                return player != null ? List.of(player) : List.of();
+            });
         } catch (Exception ignored) {
         }
         return new Argument<>(name, StringArgumentType.word(), (raw, ctx) -> {
@@ -193,11 +206,11 @@ public final class Arguments {
             Class.forName("org.bukkit.Bukkit");
             return new Argument<>(name, StringArgumentType.word(), (raw, ctx) -> {
                 String nameStr = (String) raw;
-                return org.bukkit.Bukkit.getOfflinePlayer(nameStr);
+                return Bukkit.getOfflinePlayer(nameStr);
             }).suggests(context -> {
                 try {
                     List<String> suggestions = new ArrayList<>();
-                    for (org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+                    for (Player p : Bukkit.getOnlinePlayers()) {
                         suggestions.add(p.getName());
                     }
                     return suggestions;

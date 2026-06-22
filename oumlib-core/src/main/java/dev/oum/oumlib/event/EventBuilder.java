@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 public final class EventBuilder<E> {
@@ -44,6 +45,14 @@ public final class EventBuilder<E> {
 
     public EventBuilder<E> filter(Predicate<E> predicate) {
         filters.add(predicate);
+        return this;
+    }
+
+    public <P> EventBuilder<E> playerFilter(Function<E, P> extractor, Predicate<P> condition) {
+        filters.add(e -> {
+            P p = extractor.apply(e);
+            return p != null && condition.test(p);
+        });
         return this;
     }
 

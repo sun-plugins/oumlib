@@ -17,6 +17,10 @@ public final class Promise<T> {
         this.future = future;
     }
 
+    public static <U> @NonNull Promise<U> fromCompletableFuture(@NonNull CompletableFuture<U> future) {
+        return new Promise<>(future);
+    }
+
     @Contract("_ -> new")
     public static <U> @NonNull Promise<U> supplyAsync(@NonNull Supplier<U> supplier) {
         CompletableFuture<U> fut = new CompletableFuture<>();

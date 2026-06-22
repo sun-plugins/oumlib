@@ -5,7 +5,7 @@ import dev.oum.oumlib.config.YamlParser;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
-import org.bukkit.entity.Player;
+
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -92,8 +92,12 @@ public final class Localization {
     public static @NonNull Component translateFor(@NonNull Object playerObj, @NonNull String key, TagResolver... resolvers) {
         String locale = defaultLang;
         try {
-            if (playerObj instanceof Player p) {
-                locale = p.locale().getLanguage();
+            Class<?> bukkitPlayerClass = Class.forName("org.bukkit.entity.Player");
+            if (bukkitPlayerClass.isInstance(playerObj)) {
+                Locale loc = (Locale) playerObj.getClass().getMethod("locale").invoke(playerObj);
+                if (loc != null) {
+                    locale = loc.getLanguage();
+                }
             } else {
                 Class<?> velocityPlayerClass = Class.forName("com.velocitypowered.api.proxy.Player");
                 if (velocityPlayerClass.isInstance(playerObj)) {

@@ -2,6 +2,8 @@ package dev.oum.oumlib.inventory;
 
 import dev.oum.oumlib.event.Events;
 import dev.oum.oumlib.event.ListenerHandle;
+import dev.oum.oumlib.scheduler.Scheduler;
+import dev.oum.oumlib.scheduler.TaskHandle;
 import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
@@ -17,6 +19,7 @@ import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -40,10 +43,12 @@ public final class ChestMenu implements Menu {
     private final Sound openSound;
     private final Sound closeSound;
     private final Sound clickSound;
+    private final Duration autoRefresh;
 
     private ListenerHandle clickHandle;
     private ListenerHandle dragHandle;
     private ListenerHandle closeHandle;
+    private TaskHandle refreshTask;
 
     private ChestMenu(@NonNull Builder builder) {
         this.title = builder.title;
@@ -57,6 +62,7 @@ public final class ChestMenu implements Menu {
         this.openSound = builder.openSound;
         this.closeSound = builder.closeSound;
         this.clickSound = builder.clickSound;
+        this.autoRefresh = builder.autoRefresh;
     }
 
     @Contract(" -> new")
@@ -89,7 +95,7 @@ public final class ChestMenu implements Menu {
     }
 
     @Override
-    public void open(Player player) {
+    public void open(@NonNull Player player) {
         Map<String, Object> state = playerStates.computeIfAbsent(player.getUniqueId(), uuid -> {
             Map<String, Object> map = new HashMap<>();
             stateProviders.forEach((key, provider) -> map.put(key, provider.apply(player)));
@@ -110,6 +116,16 @@ public final class ChestMenu implements Menu {
         if (openSound != null) {
             player.playSound(openSound);
         }
+        if (autoRefresh != null && refreshTask == null) {
+            refreshTask = Scheduler.runRepeating(autoRefresh, autoRefresh, () -> {
+                for (UUID uuid : open.keySet()) {
+                    Player p = Bukkit.getPlayer(uuid);
+                    if (p != null && p.isOnline()) {
+                        refresh(p);
+                    }
+                }
+            });
+        }
     }
 
     @Override
@@ -122,6 +138,10 @@ public final class ChestMenu implements Menu {
         }
         if (open.isEmpty()) {
             unregisterListeners();
+            if (refreshTask != null) {
+                refreshTask.cancel();
+                refreshTask = null;
+            }
         }
     }
 
@@ -236,6 +256,10 @@ public final class ChestMenu implements Menu {
                 playerStates.remove(player.getUniqueId());
                 if (open.isEmpty()) {
                     unregisterListeners();
+                    if (refreshTask != null) {
+                        refreshTask.cancel();
+                        refreshTask = null;
+                    }
                 }
             }
         });
@@ -282,6 +306,13 @@ public final class ChestMenu implements Menu {
         private Sound openSound;
         private Sound closeSound;
         private Sound clickSound;
+        private Duration autoRefresh;
+
+        @CheckReturnValue
+        public @NonNull Builder autoRefresh(@Nullable Duration duration) {
+            this.autoRefresh = duration;
+            return this;
+        }
 
         @CheckReturnValue
         public @NonNull Builder openSound(@Nullable Sound sound) {

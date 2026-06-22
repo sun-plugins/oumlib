@@ -42,18 +42,6 @@ public final class Scheduler {
         return adapter().runLater(ticks, task);
     }
 
-    @Contract("_, _ -> new")
-    @Deprecated(since = "1.0.4", forRemoval = true)
-    public static @NonNull TaskHandle runDelayed(Duration delay, Runnable task) {
-        return runLater(delay, task);
-    }
-
-    @Contract("_, _ -> new")
-    @Deprecated(since = "1.0.4", forRemoval = true)
-    public static @NonNull TaskHandle runDelayed(long ticks, Runnable task) {
-        return runLater(ticks, task);
-    }
-
     @Contract("_, _, _ -> new")
     public static @NonNull TaskHandle runRepeating(Duration initialDelay, Duration interval, Runnable task) {
         return adapter().runRepeating(initialDelay, interval, task);

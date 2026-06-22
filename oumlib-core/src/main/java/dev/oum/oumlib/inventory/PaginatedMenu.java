@@ -13,6 +13,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.CheckReturnValue;
 import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
 import java.util.*;
@@ -29,7 +30,7 @@ public final class PaginatedMenu implements Menu {
     private final int nextSlot;
     private final Function<Integer, ItemStack> prevButton;
     private final Function<Integer, ItemStack> nextButton;
-    private final List<ItemStack> items;
+    private final Function<Player, List<ItemStack>> itemsSupplier;
     private final PaginatedClickHandler clickHandler;
     private final Map<UUID, Integer> pages = new HashMap<>();
     private final Map<UUID, Inventory> open = new HashMap<>();
@@ -45,7 +46,7 @@ public final class PaginatedMenu implements Menu {
         this.nextSlot = builder.nextSlot;
         this.prevButton = builder.prevButton;
         this.nextButton = builder.nextButton;
-        this.items = List.copyOf(builder.items);
+        this.itemsSupplier = builder.itemsSupplier;
         this.clickHandler = builder.clickHandler;
     }
 
@@ -56,7 +57,17 @@ public final class PaginatedMenu implements Menu {
     }
 
     public int totalPages() {
-        return Math.max(1, (int) Math.ceil((double) items.size() / contentSlots.length));
+        try {
+            return totalPages(null);
+        } catch (Exception e) {
+            return 1;
+        }
+    }
+
+    public int totalPages(@Nullable Player player) {
+        List<ItemStack> list = itemsSupplier.apply(player);
+        int size = list != null ? list.size() : 0;
+        return Math.max(1, (int) Math.ceil((double) size / contentSlots.length));
     }
 
     @Override
@@ -80,7 +91,7 @@ public final class PaginatedMenu implements Menu {
     public void refresh(@NonNull Player player) {
         Inventory inv = open.get(player.getUniqueId());
         if (inv == null) return;
-        populateItems(inv, pages.getOrDefault(player.getUniqueId(), 1));
+        populateItems(player, inv, pages.getOrDefault(player.getUniqueId(), 1));
         player.updateInventory();
     }
 
@@ -89,7 +100,7 @@ public final class PaginatedMenu implements Menu {
         int page = pages.getOrDefault(player.getUniqueId(), 1);
         String resolvedTitle = title
                 .replace("<page>", String.valueOf(page))
-                .replace("<total>", String.valueOf(totalPages()));
+                .replace("<total>", String.valueOf(totalPages(player)));
         var titleComponent = MM.deserialize(resolvedTitle);
 
         Inventory inv = open.get(player.getUniqueId());
@@ -104,27 +115,29 @@ public final class PaginatedMenu implements Menu {
                 }
             } catch (Exception ignored) {
             }
-            populateItems(inv, page);
+            populateItems(player, inv, page);
             player.updateInventory();
         } else {
             inv = Bukkit.createInventory(null, rows * 9, titleComponent);
-            populateItems(inv, page);
+            populateItems(player, inv, page);
             open.put(player.getUniqueId(), inv);
             player.openInventory(inv);
         }
     }
 
-    private void populateItems(@NonNull Inventory inv, int page) {
+    private void populateItems(@NonNull Player player, @NonNull Inventory inv, int page) {
         inv.clear();
+        List<ItemStack> list = itemsSupplier.apply(player);
+        if (list == null) list = List.of();
         int start = (page - 1) * contentSlots.length;
         for (int i = 0; i < contentSlots.length; i++) {
             int idx = start + i;
-            if (idx < items.size()) inv.setItem(contentSlots[i], items.get(idx));
+            if (idx < list.size()) inv.setItem(contentSlots[i], list.get(idx));
         }
         ItemStack prev = page > 1
                 ? prevButton.apply(page)
                 : ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE).name("<gray>Previous").build();
-        ItemStack next = page < totalPages()
+        ItemStack next = page < totalPages(player)
                 ? nextButton.apply(page)
                 : ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE).name("<gray>Next").build();
         inv.setItem(prevSlot, prev);
@@ -146,20 +159,22 @@ public final class PaginatedMenu implements Menu {
                 pages.put(player.getUniqueId(), page - 1);
                 reopen(player);
                 return;
-            } else if (slot == nextSlot && page < totalPages()) {
+            } else if (slot == nextSlot && page < totalPages(player)) {
                 pages.put(player.getUniqueId(), page + 1);
                 reopen(player);
                 return;
             }
 
             if (clickHandler != null) {
+                List<ItemStack> list = itemsSupplier.apply(player);
+                if (list == null) list = List.of();
                 for (int i = 0; i < contentSlots.length; i++) {
                     if (contentSlots[i] == slot) {
                         int idx = (page - 1) * contentSlots.length + i;
-                        if (idx < items.size()) {
+                        if (idx < list.size()) {
                             clickHandler.onClick(
                                     new ClickContext(player, ClickAction.from(event.getClick()), slot, this),
-                                    items.get(idx),
+                                    list.get(idx),
                                     idx
                             );
                         }
@@ -213,7 +228,7 @@ public final class PaginatedMenu implements Menu {
 
     public static final class Builder {
 
-        private final List<ItemStack> items = new ArrayList<>();
+        private Function<Player, List<ItemStack>> itemsSupplier = p -> new ArrayList<>();
         private String title = "<gray>Page <page>/<total>";
         private int rows = 6;
         private int[] contentSlots = {10, 11, 12, 13, 14, 15, 16};
@@ -266,7 +281,13 @@ public final class PaginatedMenu implements Menu {
 
         @CheckReturnValue
         public @NonNull Builder items(@NonNull List<@NonNull ItemStack> items) {
-            this.items.addAll(items);
+            this.itemsSupplier = player -> items;
+            return this;
+        }
+
+        @CheckReturnValue
+        public @NonNull Builder items(@NonNull Function<@NonNull Player, @NonNull List<@NonNull ItemStack>> supplier) {
+            this.itemsSupplier = supplier;
             return this;
         }
 

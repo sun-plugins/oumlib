@@ -23,21 +23,41 @@ Events.listen(PlayerInteractEvent.class)
     });
 ```
 
-### Player-Specific Filtering (Paper-only)
-If you need to listen for events triggered specifically by a particular player (e.g. during a minigame, a chat prompt session, or an active GUI menu context), use `BukkitEvents.listenFor(Player, Class)`:
+### Player-Specific Filtering (Multi-Platform)
+If you need to listen for events triggered specifically by a particular player (e.g. during a minigame, a chat prompt session, or an active GUI menu context), you can use `.playerFilter(extractor, condition)` on `EventBuilder`. This is fully platform-independent and type-safe:
 
 ```java
-import dev.oum.oumlib.event.BukkitEvents;
+import dev.oum.oumlib.event.Events;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.entity.Player;
 
 Player targetPlayer = ...;
 
-BukkitEvents.listenFor(targetPlayer, PlayerInteractEvent.class)
+Events.listen(PlayerInteractEvent.class)
+    .playerFilter(PlayerInteractEvent::getPlayer, player -> player.equals(targetPlayer))
     .handler(event -> {
-        // This handler will only execute if event.getPlayer() matches the targetPlayer
         event.getPlayer().sendMessage("You interacted!");
     });
 ```
+
+On Velocity, this works exactly the same with Velocity's `Player` class and proxy events:
+
+```java
+import dev.oum.oumlib.event.Events;
+import com.velocitypowered.api.event.player.PlayerChatEvent;
+import com.velocitypowered.api.proxy.Player;
+
+Player targetPlayer = ...;
+
+Events.listen(PlayerChatEvent.class)
+    .playerFilter(PlayerChatEvent::getPlayer, player -> player.equals(targetPlayer))
+    .handler(event -> {
+        // This only fires for targetPlayer
+    });
+```
+
+> [!NOTE]
+> The legacy class `BukkitEvents` (e.g. `BukkitEvents.listenFor(...)`) has been deprecated since version `1.0.7` and is scheduled for removal. Please migrate to using `.playerFilter(...)` on the standard `Events.listen(...)` builder.
 
 ---
 

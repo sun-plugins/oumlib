@@ -164,9 +164,9 @@ Text.bossBarTemporary(
 
 ## 6. Proxy & Routing Utilities (Velocity-only)
 
-OumLib includes built-in proxy utilities inside the `Proxy` class for handling server transfers, server fallback routing, player counts, and plugin messaging on Velocity.
+OumLib includes built-in proxy utilities inside the `Proxy` class for handling server transfers, server groups, fallback routing, player counts, and cross-server plugin messaging on Velocity.
 
-### Server Connection / Player Transfer
+### Server Connection & Player Transfer
 Transfer players to registered backend servers:
 ```java
 import dev.oum.oumlib.util.Proxy;
@@ -175,28 +175,81 @@ import com.velocitypowered.api.proxy.Player;
 Proxy.connect(player, "lobby"); // returns true if connection initiated
 ```
 
-### Auto-Fallback Routing
-When players are kicked or disconnected from a backend server (e.g., during a server crash or restart), automatically redirect them to fallback/lobby servers instead of kicking them from the proxy entirely:
+### Server Groups & Balancer
+You can register multiple backend servers under a named Server Group and connect players dynamically:
 ```java
 import dev.oum.oumlib.util.Proxy;
 import java.util.List;
 
-// Run this during Proxy initialization
-Proxy.registerFallbackRouter(this, List.of("lobby-1", "lobby-2", "hub"));
+// Register server group names
+Proxy.registerGroup("lobby", List.of("lobby-1", "lobby-2", "lobby-3"));
+
+// Connect a player to the server with the lowest player count in the group
+Proxy.connectLeastPopulated(player, "lobby").thenAccept(success -> {
+    if (success) player.sendMessage("Connected to the best lobby!");
+});
+
+// Connect a player to a random server in the group
+Proxy.connectRandom(player, "lobby");
+
+// Retrieve all RegisteredServer instances in a group
+List<RegisteredServer> servers = Proxy.getGroupServers("lobby");
 ```
 
-### Server Player Counts
-Retrieve player counts for a specific server or across a cluster of servers:
+### Auto-Fallback Routing
+Redirect players automatically when kicked from a backend server. You can specify server lists or group names:
 ```java
+import dev.oum.oumlib.util.Proxy;
+import java.util.List;
+
+// 1. Route to first available server in the list
+Proxy.registerFallbackRouter(this, List.of("lobby-1", "lobby-2", "hub"));
+
+// 2. Route to first available server in a registered group
+Proxy.registerFallbackRouter(this, "lobby");
+
+// 3. Route with a custom event filter (e.g. ignore disconnects/bans)
+Proxy.registerFallbackRouter(this, "lobby", event -> {
+    return event.getServerKickReason().map(r -> !r.toString().contains("ban")).orElse(true);
+});
+```
+
+### Server Player Counts & Retrieval
+Retrieve player counts or query connected players:
+```java
+// Count players on a single server
 int lobbyCount = Proxy.getPlayerCount("lobby-1");
+
+// Count players across a group of servers
 int totalHubPlayers = Proxy.getPlayerCount(List.of("lobby-1", "lobby-2", "hub"));
+
+// Retrieve players on a server
+Collection<Player> players = Proxy.getPlayersOn("lobby-1");
+
+// Retrieve a specific player by name or UUID
+Optional<Player> target = Proxy.getPlayer("Steve");
+Optional<Player> targetUuid = Proxy.getPlayer(uuid);
 ```
 
 ### Cross-Server Plugin Messaging
-Send plugin message payloads to the player's active backend server connection without writing verbose registration boilerplate:
+Send plugin message payloads to the player's active backend server or broadcast messages across all servers:
 ```java
-byte[] messagePayload = ...;
-Proxy.sendPluginMessage(player, "myplugin:sync", messagePayload);
+import dev.oum.oumlib.util.Proxy;
+
+// 1. Send raw bytes
+byte[] data = ...;
+Proxy.sendPluginMessage(player, "myplugin:sync", data);
+
+// 2. Send using fluent DataOutput stream builder
+Proxy.sendPluginMessage(player, "myplugin:sync", out -> {
+    out.writeUTF("request_data");
+    out.writeInt(12345);
+});
+
+// 3. Broadcast to all backend servers
+Proxy.broadcastPluginMessage("myplugin:broadcast", out -> {
+    out.writeUTF("global_shutdown");
+});
 ```
 
 ### Dynamic Server Registration & Unregistration
@@ -209,29 +262,26 @@ Proxy.registerServer("games-3", "192.168.1.15", 25568);
 Proxy.unregisterServer("games-3");
 ```
 
-### Async Online Status Check (Ping)
-Check if a backend server is online and accepting connections asynchronously:
+### Promise-Based Server Querying (Ping & Status)
+Check if backend servers are online or query full status asynchronously. These methods return OumLib `Promise` wrappers instead of raw `CompletableFuture`s:
 ```java
+import dev.oum.oumlib.util.Proxy;
+
+// 1. Online check
 Proxy.isOnline("lobby-1").thenAccept(online -> {
-    if (online) {
-        player.sendMessage("Lobby-1 is online!");
+    if (online) player.sendMessage("Lobby-1 is online!");
+});
+
+// 2. Query detailed ping info (players, MOTD, version)
+Proxy.ping("lobby-1").thenAccept(result -> {
+    if (result.online()) {
+        player.sendMessage("Lobby players: " + result.currentPlayers() + "/" + result.maxPlayers());
+        player.sendMessage("MOTD: " + result.motd());
+        player.sendMessage("Version: " + result.version());
     }
 });
-```
 
-### Targeted Server Broadcasts
-Broadcast MiniMessage-formatted messages and titles directly to all players connected to a specific server:
-```java
-// Broadcast chat message
-Proxy.broadcastTo("games-1", "<green>A new match is starting in 10 seconds!</green>");
-
-// Broadcast title
-Proxy.sendTitleTo("games-1", "<red>Match Started</red>", "<gray>Good luck!</gray>");
-```
-
-### Smart Load Balancer
-Find the best server (the one online with the lowest player count) from a list of options:
-```java
+// 3. Find the lowest populated online server from a custom list
 Proxy.getBestServer(List.of("lobby-1", "lobby-2", "lobby-3"))
     .thenAccept(optServer -> {
         optServer.ifPresent(server -> {
@@ -389,5 +439,61 @@ Effects.sound(Sound.ENTITY_EXPERIENCE_ORB_PICKUP)
     .pitch(1.0f)
     .pitchVariance(0.2f)
     .play(player);
+```
+
+---
+
+## 12. Countdown Timer API
+
+OumLib features a builder-based, customizable `Countdown` timer utility. It runs on asynchronous scheduler tasks, making it safe for Folia servers, and provides fluent display configurations (titles, action bars, chat announcements), custom intervals, and sounds.
+
+### Simple Countdown:
+```java
+import dev.oum.oumlib.util.Countdown;
+import java.time.Duration;
+
+Countdown.builder(player, 10) // 10 seconds countdown targeting player/audience
+    .displayMode(Countdown.Display.TITLE) // Displays countdown on screen
+    .onComplete(audience -> {
+        audience.sendMessage(Component.text("Go!"));
+    })
+    .start();
+```
+
+### Advanced Features & Customizable Formats:
+```java
+import dev.oum.oumlib.util.Countdown;
+import dev.oum.oumlib.effect.Sounds;
+import java.time.Duration;
+
+Countdown.builder(player, 30)
+    .displayMode(Countdown.Display.CHAT)
+    // Overloaded string template utilizing Format.java utilities:
+    // %time%      -> raw seconds remaining (e.g. 5)
+    // %duration%  -> formatted duration (e.g. 1m 30s)
+    // %digital%   -> digital clock format (e.g. 01:30)
+    .format("<gold>Game starting in %duration%...</gold>")
+    
+    // Play a tick sound every second
+    .tickSound(Sounds.TICK)
+    
+    // Define custom display intervals (e.g., only show at 30s, 15s, 10s, and under 5s)
+    .intervals(30, 15, 10, 5, 4, 3, 2, 1)
+    
+    // Or filter display times dynamically via Predicate:
+    .displayFilter(seconds -> seconds % 10 == 0 || seconds <= 5)
+    
+    .onComplete(audience -> {
+        audience.sendMessage(MiniMessage.miniMessage().deserialize("<green>Match Started!</green>"));
+    })
+    .start();
+```
+
+### Chat Mode Smart Default Filter:
+When using `Display.CHAT` without configuring custom intervals or filters, the system automatically uses a non-spammy default filter that announces the remaining time only at:
+- Multiples of `10` seconds (e.g., `30s`, `20s`, `10s`)
+- Every second under `5` seconds (`5s`, `4s`, `3s`, `2s`, `1s`)
+
+This keeps player chat clean and spam-free by default.
 ```
 

@@ -128,54 +128,96 @@ To prevent standard menu bugs, OumLib implements two click protection safeguards
 
 ## 5. ItemBuilder Reference
 
-To make inventory item creations clean, OumLib includes a chainable `ItemBuilder` helper:
+To make inventory item and custom ItemStack creations clean and readable, OumLib features a chainable, component-aware `ItemBuilder` API. It supports Adventure components, MiniMessage templates, persistent data containers (PDC), and modern Paper 1.21+ data components.
 
+### Building Items:
 ```java
 import dev.oum.oumlib.inventory.ItemBuilder;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 
-// Create a new item from scratch
-ItemStack item1 = ItemBuilder.of(Material.DIAMOND_SWORD)
+// 1. Create a formatted item using MiniMessage and String lore:
+ItemStack excalibur = ItemBuilder.of(Material.DIAMOND_SWORD)
     .name("<gold>Excalibur</gold>")
-    .lore("A legendary sword", "of kings")
+    .lore(
+        "A legendary sword",
+        "of ancient kings"
+    )
     .enchant(Enchantment.SHARPNESS, 5)
     .glow() // Makes the item glow without showing enchantments flag
     .unbreakable(true)
-    .customModelData(101) // Resource pack CustomModelData
     .build();
 
-// Use Adventure Components directly:
-ItemStack item2 = ItemBuilder.of(Material.DIAMOND_SWORD)
-    .name(Component.text("Custom Sword").color(NamedTextColor.GOLD))
+// 2. Use Adventure Components directly:
+ItemStack item = ItemBuilder.of(Material.GOLDEN_APPLE)
+    .name(Component.text("Special Apple").color(NamedTextColor.GOLD))
     .lore(List.of(Component.text("A custom lore line")))
     .build();
 
-// Modify an existing item stack (Copy and Edit)
-ItemStack copied = ItemBuilder.of(item1)
-    .type(Material.NETHERITE_SWORD) // Swaps material
-    .addLore("Modified by system")  // Appends to existing lore
-    .build();
+// 3. Quick-build formatted items in one statement:
+ItemStack quickItem = ItemBuilder.quick(
+    Material.NETHERITE_INGOT,
+    "<red>Netherite Alloy</red>",
+    "<gray>High-grade metal used</gray>",
+    "<gray>for crafting gear.</gray>"
+);
+```
 
-// Store custom data in the item's Persistent Data Container (PDC)
+### Modifying and Appending:
+You can pass an existing `ItemStack` into the builder to copy it and make incremental edits:
+```java
+ItemStack copied = ItemBuilder.of(excalibur)
+    .type(Material.NETHERITE_SWORD) // Swaps material to netherite
+    .addLore("Modified by system")  // Appends to existing lore lines
+    .amount(5)                      // Sets quantity
+    .build();
+```
+
+### Modern Paper Data Component Features (1.21 & 1.21.4+):
+```java
+ItemStack modernItem = ItemBuilder.of(Material.SHIELD)
+    // Sets the client-side 3D model path (replaces legacy CustomModelData)
+    .itemModel(NamespacedKey.fromString("myplugin:custom_shield"))
+    
+    // Override item glint shine override
+    .glintOverride(true)
+    
+    // Set custom maximum stack size (e.g. stack shields/swords up to 16)
+    .maxStackSize(16)
+    
+    // Set custom max durability
+    .maxDamage(500)
+    
+    // Set fire/lava immunity (won't burn when dropped)
+    .fireResistant(true)
+    
+    .build();
+```
+
+### Persistent Data Container (PDC) Integration:
+Attach custom typed metadata directly to items without verbose serialization wrappers:
+```java
 ItemStack itemWithPdc = ItemBuilder.of(Material.GOLD_INGOT)
     .name("<gold>Treasure Ingot</gold>")
     .pdc("key_string", "some-metadata")
     .pdc("key_int", 42)
     .pdc("key_double", 3.14)
     .pdc("key_boolean", true)
-    // You can even serialize and store sub-items or lists of items inside this item's PDC:
+    
+    // You can even store sub-items or lists of items inside this item's PDC:
     .pdc("key_sub_item", new ItemStack(Material.APPLE))
     .pdc("key_item_array", new ItemStack[]{ new ItemStack(Material.COOKIE) })
     .build();
-
-// Other utility methods:
-// .clearLore() - Removes all lore lines
-// .amount(int) - Sets stack quantity
-// .flag(ItemFlag...) - Adds specific item flags
 ```
+
+### General Utilities:
+- `.clearLore()`: Removes all lore lines.
+- `.amount(int)`: Sets stack quantity.
+- `.flag(ItemFlag...)`: Adds specific item flags.
 
 ---
 
@@ -236,45 +278,4 @@ PaginatedMenu menu = PaginatedMenu.builder()
 
 // Open the menu for a player
 menu.open(player);
-```
-
----
-
-## 8. ItemBuilder Reference
-
-`ItemBuilder` provides a fluent, modern builder API to create and format `ItemStack` display names and lores using Adventure components or MiniMessage templates:
-
-```java
-import dev.oum.oumlib.inventory.ItemBuilder;
-import org.bukkit.Material;
-import org.bukkit.inventory.ItemStack;
-import net.kyori.adventure.text.Component;
-import java.util.List;
-
-// 1. Build a formatted item using MiniMessage and String lore:
-ItemStack sword = ItemBuilder.of(Material.DIAMOND_SWORD)
-    .name("<gold>Sword of Destiny</gold>")
-    .lore(
-        "<gray>An ancient blade forged in</gray>",
-        "<gray>the fires of Oum.</gray>"
-    )
-    .glow()
-    .build();
-
-// 2. Build using adventure components directly:
-Component name = Component.text("Special Item");
-List<Component> lore = List.of(Component.text("Lore line 1"));
-
-ItemStack custom = ItemBuilder.of(Material.GOLDEN_APPLE)
-    .name(name)
-    .lore(lore)
-    .build();
-
-// 3. Quick-build formatted items in one statement:
-ItemStack quickItem = ItemBuilder.quick(
-    Material.NETHERITE_INGOT,
-    "<red>Netherite Alloy</red>",
-    "<gray>High-grade metal used</gray>",
-    "<gray>for crafting gear.</gray>"
-);
 ```

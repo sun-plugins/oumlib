@@ -7,6 +7,7 @@ import org.bukkit.util.RayTraceResult;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+@Deprecated(since = "1.0.7", forRemoval = true)
 public final class Players {
 
     private Players() {

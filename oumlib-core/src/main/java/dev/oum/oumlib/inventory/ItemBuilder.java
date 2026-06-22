@@ -4,6 +4,9 @@ import com.destroystokyo.paper.profile.PlayerProfile;
 import com.google.gson.Gson;
 import dev.oum.oumlib.OumLib;
 import dev.oum.oumlib.util.ItemSerializer;
+import io.papermc.paper.datacomponent.DataComponentType;
+import io.papermc.paper.datacomponent.DataComponentTypes;
+import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
@@ -17,6 +20,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.profile.PlayerTextures;
+import org.bukkit.tag.DamageTypeTags;
 import org.jetbrains.annotations.CheckReturnValue;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
@@ -26,11 +30,7 @@ import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public final class ItemBuilder {
@@ -132,8 +132,7 @@ public final class ItemBuilder {
 
     @CheckReturnValue
     public @NonNull ItemBuilder glow() {
-        meta.addEnchant(Enchantment.UNBREAKING, 1, true);
-        meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+        meta.setEnchantmentGlintOverride(true);
         return this;
     }
 
@@ -153,6 +152,67 @@ public final class ItemBuilder {
     @CheckReturnValue
     public @NonNull ItemBuilder unbreakable(boolean value) {
         meta.setUnbreakable(value);
+        return this;
+    }
+
+    @CheckReturnValue
+    public @NonNull ItemBuilder itemModel(@NonNull Key key) {
+        meta.setItemModel(NamespacedKey.fromString(key.asString()));
+        return this;
+    }
+
+    @CheckReturnValue
+    public @NonNull ItemBuilder itemModel(@NonNull NamespacedKey key) {
+        meta.setItemModel(key);
+        return this;
+    }
+
+    @CheckReturnValue
+    public @NonNull ItemBuilder glintOverride(boolean glint) {
+        meta.setEnchantmentGlintOverride(glint);
+        return this;
+    }
+
+    @CheckReturnValue
+    public @NonNull ItemBuilder maxStackSize(int maxStackSize) {
+        meta.setMaxStackSize(maxStackSize);
+        return this;
+    }
+
+    @CheckReturnValue
+    public @NonNull ItemBuilder maxDamage(int maxDamage) {
+        stack.setData(DataComponentTypes.MAX_DAMAGE, maxDamage);
+        return this;
+    }
+
+    @CheckReturnValue
+    public @NonNull ItemBuilder fireResistant(boolean resistant) {
+        if (resistant) {
+            meta.setDamageResistant(DamageTypeTags.IS_FIRE);
+        } else {
+            meta.setDamageResistant(null);
+        }
+        return this;
+    }
+
+    @CheckReturnValue
+    public @NonNull ItemBuilder hideTooltip(boolean hide) {
+        meta.setHideTooltip(hide);
+        return this;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @CheckReturnValue
+    public @NonNull ItemBuilder data(DataComponentType.@NonNull Valued type, @NonNull Object value) {
+        stack.setItemMeta(meta);
+        stack.setData(type, value);
+        return this;
+    }
+
+    @CheckReturnValue
+    public @NonNull ItemBuilder removeData(@NonNull DataComponentType type) {
+        stack.setItemMeta(meta);
+        stack.unsetData(type);
         return this;
     }
 
@@ -240,7 +300,7 @@ public final class ItemBuilder {
             try {
                 PlayerProfile profile = Bukkit.createProfile(UUID.randomUUID(), null);
                 PlayerTextures textures = profile.getTextures();
-                
+
                 String targetUrl = textureValue;
                 if (textureValue.startsWith("ey")) {
                     try {
@@ -253,13 +313,14 @@ public final class ItemBuilder {
                                 targetUrl = decodedStr.substring(start, end);
                             }
                         }
-                    } catch (Throwable ignored) {}
+                    } catch (Throwable ignored) {
+                    }
                 }
-                
+
                 if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
                     targetUrl = "https://textures.minecraft.net/texture/" + targetUrl;
                 }
-                
+
                 URL url = URI.create(targetUrl).toURL();
                 textures.setSkin(url);
                 profile.setTextures(textures);

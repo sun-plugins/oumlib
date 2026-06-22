@@ -6,12 +6,27 @@ import net.luckperms.api.model.user.User;
 import net.luckperms.api.node.Node;
 import net.luckperms.api.node.NodeType;
 import net.luckperms.api.node.types.InheritanceNode;
+import org.bukkit.Bukkit;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+
+interface PermissionHandler {
+    String getPrimaryGroup(UUID uuid);
+
+    String getPrefix(UUID uuid);
+
+    String getSuffix(UUID uuid);
+
+    String getMetaValue(UUID uuid, String key);
+
+    List<String> getGroups(UUID uuid);
+
+    void setGroups(UUID uuid, List<String> groups, String primaryGroup);
+}
 
 public final class PermissionBridge {
 
@@ -37,12 +52,24 @@ public final class PermissionBridge {
             return null;
         }
         try {
-            if (org.bukkit.Bukkit.getPluginManager().isPluginEnabled("LuckPerms")) {
+            Class.forName("org.bukkit.Bukkit");
+            if (Bukkit.getPluginManager().isPluginEnabled("LuckPerms")) {
                 handler = new LuckPermsHandler();
                 initialized = true;
+                return handler;
             }
         } catch (Throwable ignored) {
         }
+        try {
+            Class.forName("com.velocitypowered.api.proxy.ProxyServer");
+            if (OumLib.proxy().getPluginManager().isLoaded("luckperms")) {
+                handler = new LuckPermsHandler();
+                initialized = true;
+                return handler;
+            }
+        } catch (Throwable ignored) {
+        }
+        initialized = true;
         return handler;
     }
 
@@ -81,15 +108,6 @@ public final class PermissionBridge {
             h.setGroups(uuid, groups, primaryGroup);
         }
     }
-}
-
-interface PermissionHandler {
-    String getPrimaryGroup(UUID uuid);
-    String getPrefix(UUID uuid);
-    String getSuffix(UUID uuid);
-    String getMetaValue(UUID uuid, String key);
-    List<String> getGroups(UUID uuid);
-    void setGroups(UUID uuid, List<String> groups, String primaryGroup);
 }
 
 class LuckPermsHandler implements PermissionHandler {

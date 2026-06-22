@@ -336,41 +336,6 @@ public final class Database {
     }
 
     @CheckReturnValue
-    @Deprecated(since = "1.0.5", forRemoval = false)
-    public <R> @NonNull Promise<R> transaction(@NonNull TransactionCallback<R> callback) {
-        return Promise.supplyVirtual(() -> {
-            long start = System.currentTimeMillis();
-            try (Connection conn = getConnection()) {
-                boolean wasAutoCommit = conn.getAutoCommit();
-                try {
-                    conn.setAutoCommit(false);
-                    R result = callback.execute(conn);
-                    conn.commit();
-                    long elapsed = System.currentTimeMillis() - start;
-                    if (elapsed > slowQueryThresholdMs) {
-                        OumLib.logger().warning("SLOW TRANSACTION (" + elapsed + "ms)");
-                    }
-                    return result;
-                } catch (Throwable t) {
-                    try {
-                        conn.rollback();
-                    } catch (SQLException ex) {
-                        t.addSuppressed(ex);
-                    }
-                    throw t;
-                } finally {
-                    try {
-                        conn.setAutoCommit(wasAutoCommit);
-                    } catch (SQLException ignored) {
-                    }
-                }
-            } catch (SQLException e) {
-                throw new RuntimeException("SQL transaction execution failed", e);
-            }
-        });
-    }
-
-    @CheckReturnValue
     public <R> @NonNull Promise<R> transaction(@NonNull TransactionContextCallback<R> callback) {
         return Promise.supplyVirtual(() -> {
             long start = System.currentTimeMillis();

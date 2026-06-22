@@ -109,7 +109,7 @@ public final class CommandBuilder {
     public void register() {
         try {
             CommandRegistrar registrar;
-            if (OumLib.plugin() != null) {
+            if (OumLib.isPaper()) {
                 registrar = (CommandRegistrar) Class.forName("dev.oum.oumlib.command.platform.PaperCommandRegistrar")
                         .getDeclaredConstructor().newInstance();
             } else {

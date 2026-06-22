@@ -2,6 +2,7 @@ package dev.oum.oumlib.event.platform;
 
 import dev.oum.oumlib.event.EventBuilder;
 import dev.oum.oumlib.event.ListenerHandle;
+import dev.oum.oumlib.scheduler.Scheduler;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.Listener;
@@ -11,7 +12,6 @@ import org.jspecify.annotations.NonNull;
 
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicInteger;
-import dev.oum.oumlib.scheduler.Scheduler;
 
 public final class PaperEventBus implements EventBusAdapter {
 

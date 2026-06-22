@@ -7,6 +7,7 @@ import org.jspecify.annotations.NonNull;
 import java.lang.reflect.Method;
 import java.util.UUID;
 
+@Deprecated(since = "1.0.7", forRemoval = true)
 public final class BukkitEvents {
 
     private BukkitEvents() {

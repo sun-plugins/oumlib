@@ -1,15 +1,67 @@
 # Main Setup & Initialization
 
-OumLib must be initialized during your plugin's enable phase and shut down during the disable phase. This configures the internal scheduler adapters, registers the event bus, and automatically hooks into server-wide systems.
+OumLib can be integrated either as a shared library plugin (recommended) or shaded directly into your plugin JAR. Depending on the setup method you choose, initialization is either handled automatically by the server/proxy or manually by your plugin code.
 
 ## Integration Auto-Detection
-When you call `OumLib.init()`, the library automatically scans the server's plugin manager for supported integrations. You do not need to write any integration code. It currently hooks into:
+During initialization, the library automatically scans the server's plugin manager for supported integrations. You do not need to write any integration code. It currently hooks into:
 - **PlaceholderAPI (PAPI)**: Auto-registers registered OumLib placeholders into PAPI so other plugins can use them.
 - **MiniPlaceholders**: Bridges OumLib placeholders into MiniPlaceholders' global parsing context.
 
 ---
 
-## Paper/Spigot Setup
+## 1. Shared Plugin Mode (Recommended)
+
+By placing the built `oumlib-plugin` JAR in your server's `plugins` folder, the library operates as a central dependency. Downstream plugins can share a single classloader and reference the library without needing to shade or relocate it.
+
+### Maven Dependency
+Declare `oumlib-core` with `<scope>provided</scope>` in your downstream plugin's `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>com.github.sun-mc-dev.oumlib</groupId>
+    <artifactId>oumlib-core</artifactId>
+    <version>VERSION</version>
+    <scope>provided</scope>
+</dependency>
+```
+
+### Declaring Dependencies in Metadata
+
+#### Paper/Spigot (`plugin.yml` or `paper-plugin.yml`)
+Add `OumLib` as a dependency so your plugin loads after the library:
+
+```yaml
+# plugin.yml
+depend: [OumLib]
+
+# OR paper-plugin.yml
+dependencies:
+  - name: OumLib
+    required: true
+    bootstrap: false
+```
+
+#### Velocity (`@Plugin` Annotation)
+Declare the dependency on `oumlib` inside your plugin definition:
+
+```java
+@Plugin(
+    id = "myplugin",
+    name = "MyPlugin",
+    version = "1.0.0",
+    dependencies = {
+        @Dependency(id = "oumlib")
+    }
+)
+```
+
+No initialization or shutdown calls (`OumLib.init(...)` / `OumLib.shutdown()`) are required in your plugin code; the central library plugin handles startup and cleanup automatically.
+
+---
+
+## 2. Shaded Mode (Fallback)
+
+### Paper/Spigot Setup
 
 Initialize OumLib in your main class's `onEnable()` method, and call `shutdown()` in `onDisable()` to clean up background threads and scheduler tasks.
 
@@ -25,8 +77,7 @@ public final class PaperExamplePlugin extends JavaPlugin {
     public void onEnable() {
         // Initialize OumLib for Paper.
         // OumLib.init returns an InitBuilder for method chaining configuration.
-        OumLib.init(this)
-            .build();
+        OumLib.init(this);
     }
 
     @Override
@@ -41,20 +92,18 @@ public final class PaperExamplePlugin extends JavaPlugin {
 ### The InitBuilder
 When calling `OumLib.init()`, it returns an `InitBuilder` which allows fluent configuration of library-wide features:
 - `.preset(Preset type, String prefix)`: Customizes formatting prefixes for global text presets.
-- `.build()`: Completes initialization.
 
 Example:
 ```java
 OumLib.init(this)
     .preset(Preset.INFO, "<gray>[Info]</gray> ")
     .preset(Preset.SUCCESS, "<green>[Success]</green> ")
-    .preset(Preset.ERROR, "<red>[Error]</red> ")
-    .build();
+    .preset(Preset.ERROR, "<red>[Error]</red> ");
 ```
 
 ---
 
-## Velocity Setup
+### Velocity Setup
 
 Initialize OumLib in your proxy plugin constructor or proxy initialization subscriber. 
 
@@ -82,8 +131,7 @@ public final class VelocityExamplePlugin {
     @Subscribe
     public void onProxyInitialization(ProxyInitializeEvent event) {
         // Initialize OumLib for Velocity.
-        OumLib.init(server, this)
-            .build();
+        OumLib.init(server, this);
     }
 
     @Subscribe
@@ -93,6 +141,24 @@ public final class VelocityExamplePlugin {
     }
 }
 ```
+
+---
+
+## Platform-Independent Detection Utilities
+
+To facilitate building modules or shared libraries that operate seamlessly across both Paper (server-side) and Velocity (proxy-side), OumLib provides static checks to safely detect the host platform at runtime:
+
+```java
+import dev.oum.oumlib.OumLib;
+
+if (OumLib.isPaper()) {
+    // Run Paper/Folia-specific code
+} else if (OumLib.isVelocity()) {
+    // Run Velocity-specific code
+}
+```
+
+These checks are completely safe to call on either platform. They avoid raising `IllegalStateException` or class loader errors, making it simple to write shared plugins or multi-platform systems.
 
 ---
 
