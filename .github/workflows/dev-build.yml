@@ -43,6 +43,6 @@ jobs:
       - name: Publish Dev-Build Release
         run: |
           gh release delete dev-build --yes || true
-          gh release create dev-build oumlib-plugin/target/oumlib-plugin-*.jar --title "Development Build" --notes "Automated pre-release build of OumLib."
+          gh release create dev-build oumlib-core/target/oumlib-core-*.jar --title "Development Build" --notes "Automated pre-release build of OumLib."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
