@@ -1,47 +1,79 @@
-# Command System
+# Commands & Brigadier Wrapper
 
-OumLib features a builder-based wrapper for Brigadier, providing modern command registration with platform-agnostic structures, typed arguments, dynamic completions, and integrated cooldowns.
+OumLib features a builder-based wrapper for Brigadier, providing modern command registration with platform-agnostic structures, typed arguments, completions, and cooldowns.
 
-## Registering a Command
+---
 
-A command consists of literals (names), arguments (parameters), subcommands, execution blocks, and optional parameters like permissions and cooldowns.
+## Real-world Example: Warp System
+
+Here is a warp command system supporting coordinates storage, permissions, a teleportation cooldown, and rich hover tooltips for tab completion suggestions:
 
 ```java
 import dev.oum.oumlib.command.Arguments;
 import dev.oum.oumlib.command.Commands;
+import dev.oum.oumlib.command.Argument;
+import dev.oum.oumlib.command.RichSuggestion;
 import dev.oum.oumlib.text.Text;
 import dev.oum.oumlib.util.Permission;
+import org.bukkit.Location;
+import org.bukkit.entity.Player;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-public class MyCommands {
+public final class WarpCommandRegistry {
+    private final Map<String, Location> warps = new HashMap<>();
 
-    public static void register() {
-        Permission gamemodePermission = Permission.builder("myplugin.gamemode")
-            .description("Allows player to change gamemodes")
-            .defaultValue(Permission.Default.OP)
-            .build();
+    public void register() {
+        Permission warpPermission = Permission.builder("myplugin.warp.use").build();
+        Permission adminPermission = Permission.builder("myplugin.warp.admin").build();
 
-        // Define an argument with custom suggestions
-        var modeArg = Arguments.string("mode")
-            .suggests(context -> List.of("survival", "creative", "adventure", "spectator"));
+        Argument<String> warpArg = Arguments.string("warp")
+            .suggestsRich(context -> List.of(
+                RichSuggestion.of("spawn", "Teleport to the main server spawn"),
+                RichSuggestion.of("pvp", "Teleport to the PvP combat arena"),
+                RichSuggestion.of("shop", "Teleport to the server shop market")
+            ));
 
-        Commands.literal("gamemode")
-            .permission(gamemodePermission)
-            .cooldown(
-                Duration.ofSeconds(5), 
-                "<red>Please wait <remaining> seconds before changing gamemodes again.</red>"
-            )
-            .argument(modeArg)
+        Commands.literal("warp")
+            .permission(warpPermission)
+            .cooldown(Duration.ofSeconds(10), "<red>Wait <remaining>s before warping again.</red>")
+            .argument(warpArg)
             .executes(context -> {
                 if (!context.isPlayer()) {
-                    Text.Preset.error(context.sender(), "Only players can use this command.");
+                    Text.send(context.sender(), "<red>Console cannot teleport!</red>");
                     return;
                 }
-                
-                String selectedMode = context.args().get(modeArg);
-                Text.Preset.success(context.sender(), "Changed gamemode to: " + selectedMode);
+
+                Player player = context.playerOrThrow();
+                String warpName = context.args().get(warpArg);
+                Location loc = warps.get(warpName);
+
+                if (loc == null) {
+                    Text.send(player, "<red>Warp '" + warpName + "' does not exist!</red>");
+                    return;
+                }
+
+                player.teleport(loc);
+                Text.send(player, "<green>Warped to " + warpName + "!</green>");
             })
+            .subcommand(sub -> sub
+                .label("set")
+                .permission(adminPermission)
+                .argument(Arguments.string("name"))
+                .executes(context -> {
+                    if (!context.isPlayer()) {
+                        Text.send(context.sender(), "<red>Only players can set warps.</red>");
+                        return;
+                    }
+
+                    Player player = context.playerOrThrow();
+                    String warpName = context.args().getString("name");
+                    warps.put(warpName, player.getLocation());
+                    Text.send(player, "<green>Warp '" + warpName + "' has been set to your location!</green>");
+                })
+            )
             .register();
     }
 }
@@ -49,168 +81,74 @@ public class MyCommands {
 
 ---
 
-## Subcommands
-
-You can attach subcommands to your command builder using `.subcommand(Consumer<SubcommandBuilder>)`. Subcommands support their own permissions, arguments, and execution logic.
-
-```java
-Permission warpPermission = Permission.builder("myplugin.warp").build();
-Permission warpAdminPermission = Permission.builder("myplugin.warp.admin").build();
-
-Commands.literal("warp")
-    .permission(warpPermission)
-    .subcommand(sub -> sub
-        .label("create")
-        .aliases("set", "add") // Registers aliases for subcommand
-        .permission(warpAdminPermission)
-        .argument(Arguments.string("name"))
-        .executes(context -> {
-            String name = context.args().getString("name");
-            Text.Preset.success(context.sender(), "Warp created: " + name);
-        })
-    )
-    .subcommand(sub -> sub
-        .label("tp")
-        .argument(Arguments.string("name"))
-        .executes(context -> {
-            String name = context.args().getString("name");
-            Text.Preset.info(context.sender(), "Teleporting to: " + name);
-        })
-    )
-    .register();
-```
-
----
-
-## Command Permissions
-
-You can secure commands and subcommands using raw permission `String` nodes, or by using OumLib's cross-platform `Permission` utility:
-
-```java
-import dev.oum.oumlib.command.Commands;
-import dev.oum.oumlib.util.Permission;
-
-public class AdminCommand {
-
-    private static final Permission ADMIN_PERM = Permission.builder("myplugin.admin")
-        .description("Allows admin command execution")
-        .defaultValue(Permission.Default.OP)
-        .build();
-
-    public static void register() {
-        Commands.literal("admin")
-            .permission(ADMIN_PERM) // Natively supports OumLib's Permission objects
-            .executes(context -> {
-                Text.Preset.success(context.sender(), "Admin menu opened.");
-            })
-            .register();
-    }
-}
-```
-
----
-
-## The CommandContext Structure
+## Command Context API Reference
 
 The `CommandContext` object represents the execution environment:
 
-- `context.sender()`: Returns the Kyori `Audience` representing the command executor. On Paper, this can be cast directly to a Bukkit `Player` or `ConsoleCommandSender`.
-- `context.playerOrThrow()`: Returns the player object cast to the appropriate platform type, throwing an `IllegalStateException` if the sender is not a player.
-- `context.isPlayer()`: Utility check returning `true` if the sender is a player.
-- `context.isConsole()`: Utility check returning `true` if the sender is the console.
-- `context.source()`: The underlying platform execution source. On Paper, this is Brigadier's `CommandSourceStack`. On Velocity, it is a `CommandSource`.
-- `context.args()`: Accessor for parsed command arguments. You can fetch arguments by their `Argument<T>` definition, or by their parameter name directly:
+- `context.sender()`: Returns the Kyori `Audience` representing the command executor.
+- `context.playerOrThrow()`: Returns the player object cast to the appropriate platform type.
+- `context.isPlayer()`: Returns `true` if the sender is a player.
+- `context.isConsole()`: Returns `true` if the sender is the console.
+- `context.args()`: Accessor for parsed command arguments:
   - `args.get(Argument<T>)`: Returns the type-safe parsed value.
   - `args.getString("name")`: Returns the parsed String, or `""` if not found.
   - `args.getInt("name")`: Returns the parsed integer, or `0` if not found.
   - `args.getDouble("name")`: Returns the parsed double, or `0.0` if not found.
   - `args.getBoolean("name")`: Returns the parsed boolean, or `false` if not found.
-  - `args.get("name", Class<T>)`: Returns the parsed object of the specified class directly from Brigadier.
 - `context.reply(Component)`: Sends a pre-built Adventure `Component` to the sender.
-- `context.reply(String, TagResolver...)`: Parses a MiniMessage template with optional resolvers and sends it.
-- `context.sendTranslated(String, TagResolver...)`: Automatically detects the sender's language locale, resolves the translation key from `Localization` files, parses MiniMessage placeholders, and sends the localized message.
-- `context.sendActionBar(String / Component, TagResolver...)`: Sends a MiniMessage-parsed or raw component action bar message to the sender.
-- `context.sendTitle(String title, String subtitle, TagResolver...)`: Shows a title/subtitle parsed via MiniMessage.
-- `context.sendTitle(String title, String subtitle, Duration fadeIn, Duration stay, Duration fadeOut, TagResolver...)`: Shows a title with specific fade-in, stay, and fade-out timings.
-- `context.clearTitle()`: Clears any currently displayed titles.
-
----
-
-## Custom suggestions
-
-To register tab completions for arguments dynamically, use the `.suggests(...)` method. You can supply a static list or compute suggestions dynamically using the executor:
-
-```java
-var warpArg = Arguments.string("warp")
-    .suggests(context -> {
-        // Return a list of strings to display in tab completion
-        return List.of("spawn", "shop", "pvp", "lounge");
-    });
-```
-
----
-
-## Rich Suggestions with Tooltips
-
-On modern Brigadier platforms, tab completion suggestions can show hoverable descriptive tooltips. OumLib supports this via `RichSuggestion` and `.suggestsRich(...)`:
-
-```java
-import dev.oum.oumlib.command.RichSuggestion;
-import dev.oum.oumlib.command.Arguments;
-
-var warpArg = Arguments.string("warp")
-    .suggestsRich(context -> List.of(
-        RichSuggestion.of("spawn", "Teleport to the main lobby spawn area"),
-        RichSuggestion.of("pvp", "Teleport to the PvP combat arena"),
-        RichSuggestion.of("shop", "Teleport to the server marketplace")
-    ));
-```
+- `context.reply(String, TagResolver...)`: Parses a MiniMessage template and sends it.
 
 ---
 
 ## Cooldowns & Bypasses
 
-When you configure a command cooldown:
+Configure rate-limits per player UUID automatically:
 ```java
 .cooldown(Duration.ofSeconds(10), "Cooldown active: <remaining>s")
 ```
-OumLib handles rate-limiting per player UUID automatically.
-- **Bypass Permission**: Any player who possesses the bypass permission will not trigger the cooldown. The bypass permission is automatically calculated as:
-  `<command_permission>.bypass` (e.g. `myplugin.gamemode.bypass`)
-  If the command has no permission defined, it defaults to:
-  `<command_label>.bypass` (e.g. `gamemode.bypass`)
+
+Any player who possesses the bypass permission will not trigger the cooldown. The bypass permission is automatically calculated as:
+`<command_permission>.bypass` (e.g. `myplugin.warp.use.bypass`)
+If the command has no permission defined, it defaults to:
+`<command_label>.bypass` (e.g. `warp.bypass`)
 
 ---
 
 ## Command Exception Handling
 
-To prevent raw stack traces from leaking to players and to log command errors gracefully, OumLib features a centralized exception handling pipeline.
+Configure a fallback error handler globally during OumLib initialization or define builder-specific callbacks:
 
-### 1. Global Command Error Handler
-Configure a fallback handler during OumLib initialization to log command execution failures globally (e.g. sending alerts to Discord or external log services):
-
+### Global Command Error Handler
 ```java
-OumLib.init(this)
-    .commandErrorHandler((context, exception) -> {
-        // Send a custom error message to the player
-        context.sender().sendMessage(MiniMessage.miniMessage()
-            .deserialize("<red>An unexpected error occurred: " + exception.getMessage() + "</red>"));
-            
-        // Log to console/SLF4J
-        OumLib.logError("Unhandled error in /" + context.label(), exception);
-    });
+import dev.oum.oumlib.OumLib;
+import dev.oum.oumlib.text.Text;
+import org.bukkit.plugin.java.JavaPlugin;
+
+public class CommandInitializer {
+    public void setup(JavaPlugin plugin) {
+        OumLib.init(plugin)
+            .commandErrorHandler((context, exception) -> {
+                Text.send(context.sender(), "<red>An error occurred executing this command: " + exception.getMessage() + "</red>");
+            });
+    }
+}
 ```
 
-### 2. Builder-Specific Exception Handler
-Define a custom handler for a single command to clean up local resources, reset user state, or display custom transaction error screens:
-
+### Builder-Specific Exception Handler
 ```java
-Commands.literal("buy")
-    .onException((context, exception) -> {
-        context.sender().sendMessage("<red>Transaction failed: Your balance was not charged.</red>");
-    })
-    .executes(context -> {
-        // Business logic that may throw payment exceptions
-    });
-```
+import dev.oum.oumlib.command.Commands;
+import dev.oum.oumlib.text.Text;
 
+public class TransactionCommand {
+    public void register() {
+        Commands.literal("pay")
+            .onException((context, exception) -> {
+                Text.send(context.sender(), "<red>Payment failed: Transaction rolled back.</red>");
+            })
+            .executes(context -> {
+                throw new RuntimeException("Bank server timed out");
+            })
+            .register();
+    }
+}
+```

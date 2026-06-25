@@ -80,9 +80,57 @@ public final class VelocitySchedulerAdapter implements SchedulerAdapter {
         throw new UnsupportedOperationException("Folia regional scheduling is not supported on Velocity.");
     }
 
+    @Contract("_, _, _ -> fail")
+    @Override
+    public @NonNull TaskHandle runLaterAt(Object location, Duration delay, Runnable task) {
+        throw new UnsupportedOperationException("Folia regional scheduling is not supported on Velocity.");
+    }
+
+    @Contract("_, _, _ -> fail")
+    @Override
+    public @NonNull TaskHandle runLaterAt(Object location, long ticks, Runnable task) {
+        throw new UnsupportedOperationException("Folia regional scheduling is not supported on Velocity.");
+    }
+
+    @Contract("_, _, _, _ -> fail")
+    @Override
+    public @NonNull TaskHandle runRepeatingAt(Object location, Duration initialDelay, Duration period, Runnable task) {
+        throw new UnsupportedOperationException("Folia regional scheduling is not supported on Velocity.");
+    }
+
+    @Contract("_, _, _, _ -> fail")
+    @Override
+    public @NonNull TaskHandle runRepeatingAt(Object location, long initialTicks, long periodTicks, Runnable task) {
+        throw new UnsupportedOperationException("Folia regional scheduling is not supported on Velocity.");
+    }
+
     @Contract("_, _ -> fail")
     @Override
     public @NonNull TaskHandle runFor(Object entity, Runnable task) {
+        throw new UnsupportedOperationException("Entity scheduling is not supported on Velocity.");
+    }
+
+    @Contract("_, _, _, _ -> fail")
+    @Override
+    public @NonNull TaskHandle runLaterFor(Object entity, Duration delay, Runnable task, Runnable retired) {
+        throw new UnsupportedOperationException("Entity scheduling is not supported on Velocity.");
+    }
+
+    @Contract("_, _, _, _ -> fail")
+    @Override
+    public @NonNull TaskHandle runLaterFor(Object entity, long ticks, Runnable task, Runnable retired) {
+        throw new UnsupportedOperationException("Entity scheduling is not supported on Velocity.");
+    }
+
+    @Contract("_, _, _, _, _ -> fail")
+    @Override
+    public @NonNull TaskHandle runRepeatingFor(Object entity, Duration initialDelay, Duration period, Runnable task, Runnable retired) {
+        throw new UnsupportedOperationException("Entity scheduling is not supported on Velocity.");
+    }
+
+    @Contract("_, _, _, _, _ -> fail")
+    @Override
+    public @NonNull TaskHandle runRepeatingFor(Object entity, long initialTicks, long periodTicks, Runnable task, Runnable retired) {
         throw new UnsupportedOperationException("Entity scheduling is not supported on Velocity.");
     }
 }

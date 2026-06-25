@@ -81,9 +81,49 @@ public final class Scheduler {
         return adapter().runAt(location, task);
     }
 
+    @Contract("_, _, _ -> new")
+    public static @NonNull TaskHandle runLaterAt(Object location, Duration delay, Runnable task) {
+        return adapter().runLaterAt(location, delay, task);
+    }
+
+    @Contract("_, _, _ -> new")
+    public static @NonNull TaskHandle runLaterAt(Object location, long ticks, Runnable task) {
+        return adapter().runLaterAt(location, ticks, task);
+    }
+
+    @Contract("_, _, _, _ -> new")
+    public static @NonNull TaskHandle runRepeatingAt(Object location, Duration initialDelay, Duration period, Runnable task) {
+        return adapter().runRepeatingAt(location, initialDelay, period, task);
+    }
+
+    @Contract("_, _, _, _ -> new")
+    public static @NonNull TaskHandle runRepeatingAt(Object location, long initialTicks, long periodTicks, Runnable task) {
+        return adapter().runRepeatingAt(location, initialTicks, periodTicks, task);
+    }
+
     @Contract("_, _ -> new")
     public static @NonNull TaskHandle runFor(Object entity, Runnable task) {
         return adapter().runFor(entity, task);
+    }
+
+    @Contract("_, _, _, _ -> new")
+    public static @NonNull TaskHandle runLaterFor(Object entity, Duration delay, Runnable task, Runnable retired) {
+        return adapter().runLaterFor(entity, delay, task, retired);
+    }
+
+    @Contract("_, _, _, _ -> new")
+    public static @NonNull TaskHandle runLaterFor(Object entity, long ticks, Runnable task, Runnable retired) {
+        return adapter().runLaterFor(entity, ticks, task, retired);
+    }
+
+    @Contract("_, _, _, _, _ -> new")
+    public static @NonNull TaskHandle runRepeatingFor(Object entity, Duration initialDelay, Duration period, Runnable task, Runnable retired) {
+        return adapter().runRepeatingFor(entity, initialDelay, period, task, retired);
+    }
+
+    @Contract("_, _, _, _, _ -> new")
+    public static @NonNull TaskHandle runRepeatingFor(Object entity, long initialTicks, long periodTicks, Runnable task, Runnable retired) {
+        return adapter().runRepeatingFor(entity, initialTicks, periodTicks, task, retired);
     }
 
     @CheckReturnValue

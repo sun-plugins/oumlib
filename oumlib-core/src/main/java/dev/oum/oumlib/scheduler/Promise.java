@@ -141,6 +141,56 @@ public final class Promise<T> {
         return this;
     }
 
+    public <U> @NonNull Promise<U> mapSyncFor(@NonNull Object entity, @NonNull Function<T, U> mapper) {
+        CompletableFuture<U> next = new CompletableFuture<>();
+        future.whenComplete((val, err) -> {
+            if (err != null) {
+                next.completeExceptionally(err);
+            } else {
+                Scheduler.runFor(entity, () -> {
+                    try {
+                        next.complete(mapper.apply(val));
+                    } catch (Throwable t) {
+                        next.completeExceptionally(t);
+                    }
+                });
+            }
+        });
+        return new Promise<>(next);
+    }
+
+    public @NonNull Promise<Void> thenAcceptSyncFor(@NonNull Object entity, @NonNull Consumer<T> action) {
+        CompletableFuture<Void> next = new CompletableFuture<>();
+        future.whenComplete((val, err) -> {
+            if (err != null) {
+                next.completeExceptionally(err);
+            } else {
+                Scheduler.runFor(entity, () -> {
+                    try {
+                        action.accept(val);
+                        next.complete(null);
+                    } catch (Throwable t) {
+                        next.completeExceptionally(t);
+                    }
+                });
+            }
+        });
+        return new Promise<>(next);
+    }
+
+    public @NonNull Promise<T> whenCompleteSyncFor(@NonNull Object entity, @Nullable Consumer<T> success, @Nullable Consumer<Throwable> failure) {
+        future.whenComplete((val, err) -> {
+            Scheduler.runFor(entity, () -> {
+                if (err != null) {
+                    if (failure != null) failure.accept(err);
+                } else {
+                    if (success != null) success.accept(val);
+                }
+            });
+        });
+        return this;
+    }
+
     public @NonNull CompletableFuture<T> toCompletableFuture() {
         return future;
     }

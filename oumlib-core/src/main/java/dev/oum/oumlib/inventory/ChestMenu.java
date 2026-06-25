@@ -5,6 +5,7 @@ import dev.oum.oumlib.event.ListenerHandle;
 import dev.oum.oumlib.scheduler.Scheduler;
 import dev.oum.oumlib.scheduler.TaskHandle;
 import net.kyori.adventure.sound.Sound;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -39,7 +40,7 @@ public final class ChestMenu implements Menu {
     private final Map<UUID, Map<String, Object>> playerStates = new ConcurrentHashMap<>();
     private final List<Integer> unlockedSlots;
     private final Consumer<Player> onClose;
-    private final Map<UUID, Inventory> open = new HashMap<>();
+    private final Map<UUID, Inventory> open = new ConcurrentHashMap<>();
     private final Sound openSound;
     private final Sound closeSound;
     private final Sound clickSound;
@@ -77,87 +78,102 @@ public final class ChestMenu implements Menu {
         return state != null ? (T) state.get(key) : null;
     }
 
-    @SuppressWarnings("deprecation")
     public void updateState(@NonNull Player player, @NonNull String key, @Nullable Object value) {
-        Map<String, Object> state = playerStates.get(player.getUniqueId());
-        if (state != null) {
-            state.put(key, value);
-            String resolvedTitle = title;
-            for (Map.Entry<String, Object> entry : state.entrySet()) {
-                resolvedTitle = resolvedTitle.replace("{" + entry.getKey() + "}", String.valueOf(entry.getValue()));
+        Scheduler.runFor(player, () -> {
+            Map<String, Object> state = playerStates.get(player.getUniqueId());
+            if (state != null) {
+                state.put(key, value);
+                String resolvedTitle = title;
+                for (Map.Entry<String, Object> entry : state.entrySet()) {
+                    resolvedTitle = resolvedTitle.replace("{" + entry.getKey() + "}", String.valueOf(entry.getValue()));
+                }
+                try {
+                    var view = player.getOpenInventory();
+                    try {
+                        var method = view.getClass().getMethod("setTitle", Component.class);
+                        method.invoke(view, MM.deserialize(resolvedTitle));
+                    } catch (NoSuchMethodException e) {
+                        view.setTitle(resolvedTitle);
+                    }
+                } catch (Throwable ignored) {
+                }
+                refresh(player);
             }
-            try {
-                player.getOpenInventory().setTitle(resolvedTitle);
-            } catch (Throwable ignored) {
-            }
-            refresh(player);
-        }
+        });
     }
 
     @Override
     public void open(@NonNull Player player) {
-        Map<String, Object> state = playerStates.computeIfAbsent(player.getUniqueId(), uuid -> {
-            Map<String, Object> map = new HashMap<>();
-            stateProviders.forEach((key, provider) -> map.put(key, provider.apply(player)));
-            return map;
-        });
-
-        String resolvedTitle = title;
-        for (Map.Entry<String, Object> entry : state.entrySet()) {
-            resolvedTitle = resolvedTitle.replace("{" + entry.getKey() + "}", String.valueOf(entry.getValue()));
-        }
-
-        Inventory inv = Bukkit.createInventory(null, rows * 9, MM.deserialize(resolvedTitle));
-        if (layout != null) layout.apply(inv, player);
-        slotItems.forEach((slot, function) -> inv.setItem(slot, function.apply(player)));
-        open.put(player.getUniqueId(), inv);
-        registerListeners();
-        player.openInventory(inv);
-        if (openSound != null) {
-            player.playSound(openSound);
-        }
-        if (autoRefresh != null && refreshTask == null) {
-            refreshTask = Scheduler.runRepeating(autoRefresh, autoRefresh, () -> {
-                for (UUID uuid : open.keySet()) {
-                    Player p = Bukkit.getPlayer(uuid);
-                    if (p != null && p.isOnline()) {
-                        refresh(p);
-                    }
-                }
+        Scheduler.runFor(player, () -> {
+            Map<String, Object> state = playerStates.computeIfAbsent(player.getUniqueId(), uuid -> {
+                Map<String, Object> map = new HashMap<>();
+                stateProviders.forEach((key, provider) -> map.put(key, provider.apply(player)));
+                return map;
             });
-        }
+
+            String resolvedTitle = title;
+            for (Map.Entry<String, Object> entry : state.entrySet()) {
+                resolvedTitle = resolvedTitle.replace("{" + entry.getKey() + "}", String.valueOf(entry.getValue()));
+            }
+
+            Inventory inv = Bukkit.createInventory(null, rows * 9, MM.deserialize(resolvedTitle));
+            if (layout != null) layout.apply(inv, player);
+            slotItems.forEach((slot, function) -> inv.setItem(slot, function.apply(player)));
+            open.put(player.getUniqueId(), inv);
+            registerListeners();
+            player.openInventory(inv);
+            if (openSound != null) {
+                player.playSound(openSound);
+            }
+            if (autoRefresh != null && refreshTask == null) {
+                refreshTask = Scheduler.runRepeating(autoRefresh, autoRefresh, () -> {
+                    for (UUID uuid : open.keySet()) {
+                        Player p = Bukkit.getPlayer(uuid);
+                        if (p != null && p.isOnline()) {
+                            refresh(p);
+                        }
+                    }
+                });
+            }
+        });
     }
 
     @Override
     public void close(@NonNull Player player) {
-        open.remove(player.getUniqueId());
-        playerStates.remove(player.getUniqueId());
-        player.closeInventory();
-        if (closeSound != null) {
-            player.playSound(closeSound);
-        }
-        if (open.isEmpty()) {
-            unregisterListeners();
-            if (refreshTask != null) {
-                refreshTask.cancel();
-                refreshTask = null;
+        Scheduler.runFor(player, () -> {
+            open.remove(player.getUniqueId());
+            playerStates.remove(player.getUniqueId());
+            player.closeInventory();
+            if (closeSound != null) {
+                player.playSound(closeSound);
             }
-        }
+            if (open.isEmpty()) {
+                unregisterListeners();
+                if (refreshTask != null) {
+                    refreshTask.cancel();
+                    refreshTask = null;
+                }
+            }
+        });
     }
 
     public void refresh(@NonNull Player player) {
-        Inventory inv = open.get(player.getUniqueId());
-        if (inv == null) return;
-        if (layout != null) layout.apply(inv, player);
-        slotItems.forEach((slot, function) -> inv.setItem(slot, function.apply(player)));
-        player.updateInventory();
+        Scheduler.runFor(player, () -> {
+            Inventory inv = open.get(player.getUniqueId());
+            if (inv == null) return;
+            if (layout != null) layout.apply(inv, player);
+            slotItems.forEach((slot, function) -> inv.setItem(slot, function.apply(player)));
+            player.updateInventory();
+        });
     }
 
     public void setItem(@NonNull Player player, int slot, ItemStack item) {
-        Inventory inv = open.get(player.getUniqueId());
-        if (inv == null) return;
-        inv.setItem(slot, item);
-        player.updateInventory();
+        Scheduler.runFor(player, () -> {
+            Inventory inv = open.get(player.getUniqueId());
+            if (inv == null) return;
+            inv.setItem(slot, item);
+            player.updateInventory();
+        });
     }
 
     private @Nullable ItemStack moveItemToUnlockedSlots(Inventory inv, @NonNull ItemStack toMove) {

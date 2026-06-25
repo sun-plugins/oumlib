@@ -1,210 +1,121 @@
-# Text & Placeholders
+# Text & Placeholders System
 
-OumLib handles chat and message rendering using Kyori Adventure's **MiniMessage** format. It includes default message styling presets and a custom placeholder registration system that bridges dynamically into PlaceholderAPI (PAPI) and MiniPlaceholders.
+OumLib handles chat formatting and text rendering using Kyori Adventure's MiniMessage format. It includes default message styling presets and a custom placeholder registration system that bridges dynamically into PlaceholderAPI (PAPI) and MiniPlaceholders.
 
 ---
 
-## 1. MiniMessage & Formatting
+## Real-world Example: Chat Trivia Challenge
 
-All text functions in OumLib parse MiniMessage format by default. You can use standard MiniMessage tags like `<color>`, `<hover>`, and `<click>`:
+Here is a chat trivia challenge manager. It broadcasts localized question messages and opens a secure chat-capture session for the player using `TextInput`, validating answers and playing audio cues:
+
+```java
+import dev.oum.oumlib.effect.Effects;
+import dev.oum.oumlib.text.Localization;
+import dev.oum.oumlib.text.Text;
+import dev.oum.oumlib.text.TextInput;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import org.bukkit.Sound;
+import org.bukkit.entity.Player;
+import java.time.Duration;
+
+public final class TriviaChallengeManager {
+    public void startTrivia(Player player) {
+        player.sendMessage(Localization.translateFor(player, "trivia.start"));
+
+        TextInput.builder()
+            .prompt(Localization.translateFor(player, "trivia.question"))
+            .timeout(Duration.ofSeconds(15))
+            .cancelWord("quit")
+            .onTimeout(p -> {
+                Text.send(p, "<red>Time's up! You failed the challenge.</red>");
+                Effects.sound(Sound.BLOCK_ANVIL_LAND).volume(1.0F).pitch(1.0F).play(p);
+            })
+            .onCancel(p -> {
+                Text.send(p, "<gray>Trivia session closed.</gray>");
+            })
+            .onInput((p, answer) -> {
+                if (answer.equalsIgnoreCase("Minecraft")) {
+                    Text.send(p, "<green>Correct answer!</green>");
+                    Effects.sound(Sound.ENTITY_PLAYER_LEVELUP).volume(1.0F).pitch(1.0F).play(p);
+                    
+                    p.sendMessage(Localization.translateFor(p, "trivia.completed", 
+                        Placeholder.parsed("score", "100")
+                    ));
+                    return true;
+                }
+                
+                Text.send(p, "<red>Incorrect! Try again (or type 'quit'):</red>");
+                return false;
+            })
+            .start(player);
+    }
+}
+```
+
+YAML translation resource file (`lang/en.yml`):
+```yaml
+trivia:
+  start: "<gold>[Trivia]</gold> A new challenge has started!"
+  question: "<yellow>[Trivia]</yellow> What game is this plugin written for?"
+  completed: "<green>Challenge completed! Score added: <score></green>"
+```
+
+---
+
+## Text Presets
+
+OumLib defines standard text presets for consistent messaging styles:
 
 ```java
 import dev.oum.oumlib.text.Text;
+import org.bukkit.entity.Player;
 
-Text.send(player, "<gold>Welcome!</gold> Click <red><hover:show_text:'Go!'>[here]</hover></red>.");
+public class FeedbackSender {
+    public void sendFeedback(Player player) {
+        Text.Preset.info(player, "Your profile is loading.");
+        Text.Preset.success(player, "Coins added to balance.");
+        Text.Preset.error(player, "Payment rejected!");
+    }
+}
 ```
 
 ---
 
-## 2. Text Presets
+## Placeholder Registration
 
-OumLib defines standard text presets to ensure clean, consistent messaging styles across your plugin:
-- **`Text.Preset.info(player, message)`**: Displays a standard informational message (typically gray/blue).
-- **`Text.Preset.success(player, message)`**: Displays a success message (typically green).
-- **`Text.Preset.error(player, message)`**: Displays an error message (typically red).
-
-You can configure the prefix for these presets during OumLib initialization:
-```java
-OumLib.init(this)
-    .preset(Preset.INFO, "<gray>[Info]</gray> ")
-    .preset(Preset.SUCCESS, "<green>[Success]</green> ")
-    .preset(Preset.ERROR, "<red>[Error]</red> ");
-```
-
----
-
-## 3. Placeholder System
-
-You can register custom placeholders under your plugin's identifier. 
-
-### Dynamic Placeholder Mappings
-When you register a placeholder (e.g. `coins` under the namespace `myplugin`):
-1. **OumLib Internal Resolver**: Resolves `<myplugin_coins>` inside OumLib text calls.
-2. **PlaceholderAPI Bridge**: Automatically registers `%myplugin_coins%` in PlaceholderAPI.
-3. **MiniPlaceholders Bridge**: Automatically registers `<myplugin_coins>` in MiniPlaceholders.
+Register custom placeholders under your plugin's identifier namespace. Registered placeholders are automatically bridged into PAPI and MiniPlaceholders:
 
 ```java
 import dev.oum.oumlib.OumLib;
+import org.bukkit.entity.Player;
 
-// Register player-specific coins placeholder
-OumLib.placeholders("myplugin")
-    .add("coins", player -> {
-        // Since OumLib is cross-platform, player is passed as Object.
-        // Cast it to org.bukkit.entity.Player (Paper) or com.velocitypowered.api.proxy.Player (Velocity)
-        if (player instanceof org.bukkit.entity.Player p) {
-            return String.valueOf(p.getLevel() * 10);
-        }
-        return "0";
-    });
+public class LevelPlaceholderRegistry {
+    public void register() {
+        OumLib.placeholders("myplugin")
+            .add("level", player -> {
+                if (player instanceof Player p) {
+                    return String.valueOf(p.getLevel());
+                }
+                return "0";
+            });
+    }
+}
 ```
 
 ---
 
-## 4. Manual Placeholder Resolution
+## Global Broadcasts
 
-If you need to parse placeholders inside a raw string manually (handling both MiniMessage format and legacy PlaceholderAPI formats), use `Placeholders.resolve()`:
-
-```java
-import dev.oum.oumlib.text.Placeholders;
-
-String parsed = Placeholders.resolve(
-    player, 
-    "You have %myplugin_coins% coins remaining."
-);
-```
-OumLib will first evaluate standard placeholders internally, and if PlaceholderAPI is enabled on the server, it will pass the text to PAPI for a secondary evaluation, resolving all server-wide placeholders.
-
----
-
-## 5. Global Broadcasts & Platform-Agnostic Audiences
-
-Instead of manually fetching players from Paper/Velocity APIs to send messages, OumLib provides platform-agnostic methods to access all connected players or the console.
-
-### Platform-Agnostic Audiences
-- **`OumLib.players()`**: Returns a unified Kyori `Audience` containing all online players on the server (Paper) or proxy (Velocity).
-- **`OumLib.console()`**: Returns the console command sender/source `Audience`.
-
-### Global Broadcast Methods
-You can broadcast MiniMessage formatted text to all online players dynamically:
+Broadcast MiniMessage-formatted text, action bars, or titles to all connected players or console:
 
 ```java
 import dev.oum.oumlib.text.Text;
 
-// 1. Simple text broadcast
-Text.broadcast("<yellow>The server is reloading in 5 minutes!</yellow>");
-
-// 2. Broadcast with placeholders
-Text.broadcast("<yellow>Winner is <winner>!</yellow>", "winner", playerName);
-
-// 3. Broadcast with a Record data injector
-Text.broadcast("<gold>Stats update: Joins: <joins> | Sent: <sent></gold>", myStatsRecord);
-
-// 4. Broadcast to action bars
-Text.broadcastActionBar("<red>Warning: System overload!</red>");
-
-// 5. Broadcast global titles
-Text.broadcastTitle("<gold>VICTORY!</gold>", "<gray>Blue team won the match</gray>");
+public class AlertBroadcaster {
+    public void announceMaintenance() {
+        Text.broadcast("<red>[Alert]</red> Maintenance starts in 10 minutes!");
+        Text.broadcastActionBar("<red>Warning: Save progress now!</red>");
+        Text.broadcastTitle("<red>MAINTENANCE</red>", "<gray>Please finish transactions</gray>");
+    }
+}
 ```
-
-### Broadcast Presets
-You can also trigger styled broadcasts matching your registered preset styles:
-
-```java
-// Sends success message with success prefix to all players
-Text.Preset.successBroadcast("A global event has begun!");
-
-// Sends error message with error prefix to all players
-Text.Preset.errorBroadcast("The database connection was lost!");
-```
-
----
-
-## 6. Localization & Multi-Language (I18n)
-
-OumLib features a built-in localization (I18n) system that automatically loads, parses, and translates keys into localized `Component`s using MiniMessage format. It supports player client locale translation out-of-the-box on both Paper and Velocity.
-
-### Initializing the System
-
-To initialize, specify the default language code (e.g. `en`). OumLib will look inside the `lang/` subfolder in your plugin's data folder (and automatically extract the default lang file if it doesn't exist):
-
-```java
-import dev.oum.oumlib.text.Localization;
-
-// Load translation files (e.g. lang/en.yml, lang/es.yml)
-Localization.load("en");
-```
-
-### Structuring Lang Files
-
-Language files use standard nested YAML, which OumLib flattens to dot-notation paths internally:
-
-```yaml
-# lang/en.yml
-general:
-  welcome: "<green>Welcome back, <player>!</green>"
-  no-permission: "<red>You do not have permission to do this.</red>"
-```
-
-### Translating Messages
-
-You can translate using the default language, or fetch translations dynamically targeting a player's client language:
-
-```java
-import dev.oum.oumlib.text.Localization;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import org.bukkit.entity.Player;
-
-Player player = ...;
-
-// 1. Send localized message matching player's Minecraft client locale settings (e.g. Spanish)
-player.sendMessage(Localization.translateFor(player, "general.welcome", 
-    Placeholder.parsed("player", player.getName())
-));
-
-// 2. Fallback to default server translation
-Component msg = Localization.translate("general.no-permission");
-```
-
----
-
-## 7. Asynchronous Chat-based Text Input (TextInput)
-
-`TextInput` provides a clean, async, and non-blocking way to capture text input from players directly via the standard server chat, without opening graphical inventory UIs like anvils.
-
-It automatically intercepts the player's next chat message, cancels the chat event to prevent others from seeing the input, and passes it to your callback. It includes full session timeout handling, quit-listener cleanup, and customized cancellation keywords.
-
-```java
-import dev.oum.oumlib.text.TextInput;
-import net.kyori.adventure.text.minimessage.MiniMessage;
-import java.time.Duration;
-
-TextInput.builder()
-    // Define the prompt message sent to the player when the session starts
-    .prompt(MiniMessage.miniMessage().deserialize("<yellow>Please type your new home name (or type 'cancel' to exit):</yellow>"))
-    // Set a session timeout duration (defaults to 10s)
-    .timeout(Duration.ofSeconds(30))
-    // Custom cancellation word (defaults to "cancel", case-insensitive)
-    .cancelWord("cancel")
-    // Triggered if the session times out
-    .onTimeout(player -> {
-        player.sendMessage("Home creation timed out.");
-    })
-    // Triggered if the player cancels explicitly
-    .onCancel(player -> {
-        player.sendMessage("Home creation cancelled.");
-    })
-    // Core input callback. Return true to accept and end the session, 
-    // or false to reject (keeping the input session open for another attempt).
-    .onInput((player, message) -> {
-        if (message.length() < 3) {
-            player.sendMessage("Name is too short! Try again:");
-            return false; 
-        }
-        
-        homes.createHome(player, message);
-        player.sendMessage("Home '" + message + "' successfully created!");
-        return true; 
-    })
-    .start(player);
-```
-

@@ -68,9 +68,8 @@ public final class OumLib {
         BukkitSchedulerAdapter.initialize(p);
         Scheduler.initialize(BukkitSchedulerAdapter.get());
 
-        p.getServer().getMessenger().registerIncomingPluginChannel(p, "oumlib:autocomplete", (channel, player, message) -> {
-            handleSpigotAutocompleteMessage(player, message);
-        });
+        p.getServer().getMessenger().registerIncomingPluginChannel(p, "oumlib:autocomplete",
+                (channel, player, message) -> handleSpigotAutocompleteMessage(player, message));
         p.getServer().getMessenger().registerOutgoingPluginChannel(p, "oumlib:autocomplete");
 
         detectIntegrations(p);

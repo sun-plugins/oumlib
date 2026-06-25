@@ -9,6 +9,8 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.title.Title;
 import org.jetbrains.annotations.CheckReturnValue;
 import org.jetbrains.annotations.Contract;
@@ -16,7 +18,10 @@ import org.jspecify.annotations.NonNull;
 
 import java.lang.reflect.RecordComponent;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+
+import static dev.oum.oumlib.text.Preset.*;
 
 public final class Text {
 
@@ -26,25 +31,28 @@ public final class Text {
     }
 
     public static void send(@NonNull Audience audience, String message, Object... pairs) {
-        audience.sendMessage(parse(resolve(message, audience, pairs)));
+        audience.sendMessage(parse(resolve(message, audience), createResolvers(pairs)));
     }
 
     public static void send(@NonNull Audience audience, String message) {
         audience.sendMessage(parse(resolve(message, audience)));
     }
 
-    public static void send(Audience audience, String message, Record data) {
-        String injected = injectRecord(message, data);
-        String resolved = resolve(injected, audience);
-        audience.sendMessage(parse(resolved));
+    public static void send(@NonNull Audience audience, String message, Record data) {
+        audience.sendMessage(parse(resolve(message, audience), createResolvers(data)));
     }
 
     public static void sendLines(Audience audience, @NonNull List<String> lines, Object... pairs) {
-        lines.forEach(line -> send(audience, line, pairs));
+        TagResolver[] resolvers = createResolvers(pairs);
+        lines.forEach(line -> audience.sendMessage(parse(resolve(line, audience), resolvers)));
     }
 
     public static @NonNull Component parse(String message) {
         return MM.deserialize(message);
+    }
+
+    public static @NonNull Component parse(String message, TagResolver... resolvers) {
+        return MM.deserialize(message, resolvers);
     }
 
     public static @NonNull String strip(String message) {
@@ -52,7 +60,7 @@ public final class Text {
     }
 
     public static void actionBar(@NonNull Audience audience, String message, Object... pairs) {
-        audience.sendActionBar(parse(resolve(message, audience, pairs)));
+        audience.sendActionBar(parse(resolve(message, audience), createResolvers(pairs)));
     }
 
     public static void title(@NonNull Audience audience, String title, String subtitle,
@@ -65,17 +73,15 @@ public final class Text {
     }
 
     public static void broadcast(String message, Object... pairs) {
-        OumLib.players().sendMessage(parse(resolve(message, null, pairs)));
+        OumLib.players().sendMessage(parse(resolve(message, null), createResolvers(pairs)));
     }
 
     public static void broadcast(String message, Record data) {
-        String injected = injectRecord(message, data);
-        String resolved = resolve(injected, null);
-        OumLib.players().sendMessage(parse(resolved));
+        OumLib.players().sendMessage(parse(resolve(message, null), createResolvers(data)));
     }
 
     public static void broadcastActionBar(String message, Object... pairs) {
-        OumLib.players().sendActionBar(parse(resolve(message, null, pairs)));
+        OumLib.players().sendActionBar(parse(resolve(message, null), createResolvers(pairs)));
     }
 
     public static void broadcastTitle(String title, String subtitle, Duration fadeIn, Duration stay, Duration fadeOut) {
@@ -98,30 +104,42 @@ public final class Text {
         return c;
     }
 
-    private static @NonNull String resolve(String input, Object player, Object @NonNull ... pairs) {
-        String result = input;
+    private static @NonNull TagResolver @NonNull [] createResolvers(Object @NonNull ... pairs) {
+        if (pairs.length == 0) return new TagResolver[0];
+        List<TagResolver> resolvers = new ArrayList<>();
         for (int i = 0; i + 1 < pairs.length; i += 2) {
-            result = result.replace("<" + pairs[i] + ">", MM.escapeTags(String.valueOf(pairs[i + 1])));
+            String key = String.valueOf(pairs[i]);
+            Object val = pairs[i + 1];
+            if (val instanceof Component comp) {
+                resolvers.add(Placeholder.component(key, comp));
+            } else {
+                resolvers.add(Placeholder.parsed(key, String.valueOf(val)));
+            }
         }
-        return PlaceholderResolver.resolveInternal(result, player);
+        return resolvers.toArray(new TagResolver[0]);
+    }
+
+    @Contract("null -> new")
+    private static @NonNull TagResolver @NonNull [] createResolvers(Record data) {
+        if (data == null) return new TagResolver[0];
+        List<TagResolver> resolvers = new ArrayList<>();
+        try {
+            for (RecordComponent comp : data.getClass().getRecordComponents()) {
+                Object val = comp.getAccessor().invoke(data);
+                String key = comp.getName();
+                if (val instanceof Component compVal) {
+                    resolvers.add(Placeholder.component(key, compVal));
+                } else {
+                    resolvers.add(Placeholder.parsed(key, val != null ? String.valueOf(val) : ""));
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return resolvers.toArray(new TagResolver[0]);
     }
 
     private static @NonNull String resolve(String input, Object player) {
         return PlaceholderResolver.resolveInternal(input, player);
-    }
-
-    private static String injectRecord(String input, Record data) {
-        if (data == null) return input;
-        String result = input;
-        try {
-            for (RecordComponent comp : data.getClass().getRecordComponents()) {
-                Object val = comp.getAccessor().invoke(data);
-                result = result.replace("<" + comp.getName() + ">",
-                        val != null ? MM.escapeTags(String.valueOf(val)) : "");
-            }
-        } catch (Exception ignored) {
-        }
-        return result;
     }
 
     public static @NonNull BossBar bossBar(@NonNull Audience audience, @NonNull String titleMiniMessage,
@@ -136,7 +154,20 @@ public final class Text {
                                         float progress, BossBar.@NonNull Color color, BossBar.@NonNull Overlay overlay,
                                         @NonNull Duration duration) {
         BossBar bar = bossBar(audience, titleMiniMessage, progress, color, overlay);
-        Scheduler.runLater(duration, () -> audience.hideBossBar(bar));
+        if (OumLib.isPaper() && isBukkitPlayer(audience)) {
+            Scheduler.runLaterFor(audience, duration, () -> audience.hideBossBar(bar), () -> {
+            });
+        } else {
+            Scheduler.runLater(duration, () -> audience.hideBossBar(bar));
+        }
+    }
+
+    private static boolean isBukkitPlayer(Object audience) {
+        try {
+            return Class.forName("org.bukkit.entity.Player").isInstance(audience);
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
     }
 
     public static void ascii(boolean colorized, String @NonNull ... lines) {
@@ -159,35 +190,35 @@ public final class Text {
         }
 
         public static void success(Audience audience, String message, Object... pairs) {
-            send(audience, OumLib.presets().prefix(dev.oum.oumlib.text.Preset.SUCCESS) + message, pairs);
+            send(audience, OumLib.presets().prefix(SUCCESS) + message, pairs);
         }
 
         public static void error(Audience audience, String message, Object... pairs) {
-            send(audience, OumLib.presets().prefix(dev.oum.oumlib.text.Preset.ERROR) + message, pairs);
+            send(audience, OumLib.presets().prefix(ERROR) + message, pairs);
         }
 
         public static void info(Audience audience, String message, Object... pairs) {
-            send(audience, OumLib.presets().prefix(dev.oum.oumlib.text.Preset.INFO) + message, pairs);
+            send(audience, OumLib.presets().prefix(INFO) + message, pairs);
         }
 
         public static void warning(Audience audience, String message, Object... pairs) {
-            send(audience, OumLib.presets().prefix(dev.oum.oumlib.text.Preset.WARNING) + message, pairs);
+            send(audience, OumLib.presets().prefix(WARNING) + message, pairs);
         }
 
         public static void successBroadcast(String message, Object... pairs) {
-            broadcast(OumLib.presets().prefix(dev.oum.oumlib.text.Preset.SUCCESS) + message, pairs);
+            broadcast(OumLib.presets().prefix(SUCCESS) + message, pairs);
         }
 
         public static void errorBroadcast(String message, Object... pairs) {
-            broadcast(OumLib.presets().prefix(dev.oum.oumlib.text.Preset.ERROR) + message, pairs);
+            broadcast(OumLib.presets().prefix(ERROR) + message, pairs);
         }
 
         public static void infoBroadcast(String message, Object... pairs) {
-            broadcast(OumLib.presets().prefix(dev.oum.oumlib.text.Preset.INFO) + message, pairs);
+            broadcast(OumLib.presets().prefix(INFO) + message, pairs);
         }
 
         public static void warningBroadcast(String message, Object... pairs) {
-            broadcast(OumLib.presets().prefix(dev.oum.oumlib.text.Preset.WARNING) + message, pairs);
+            broadcast(OumLib.presets().prefix(WARNING) + message, pairs);
         }
     }
 }

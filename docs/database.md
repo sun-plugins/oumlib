@@ -1,223 +1,105 @@
 # Database Tools
 
-OumLib includes a high-performance SQL database wrapper powered by **HikariCP 7.0.2** supporting both **SQLite** and **MySQL**. It utilizes Java 25 virtual threads via `Promise` for non-blocking asynchronous operations, preventing server thread stalling.
+OumLib includes a high-performance SQL database wrapper powered by HikariCP supporting both SQLite and MySQL. It utilizes virtual threads via `Promise` for non-blocking asynchronous operations.
 
 ---
 
-## 1. Connecting to a Database
+## Real-world Example: Player Profile Management
 
-OumLib automatically establishes a Hikari connection pool with sensible defaults (like statement caching, performance optimizations, and correct write-concurrency limits).
+Here is a profile system that loads players' statistics upon connection, updates their score values, and handles transaction-safe currency transfers between two players:
 
-### SQLite Connection (Single-threaded file lock safety)
-For SQLite, OumLib enforces a `maximumPoolSize` of `1` by default. This is the industry-standard best practice to prevent concurrent write locks on the SQLite file.
+```java
+import dev.oum.oumlib.database.Database;
+import dev.oum.oumlib.text.Text;
+import org.bukkit.entity.Player;
+import java.io.File;
+import java.util.UUID;
+
+public record UserProfile(String uuid, int coins, int level) {}
+
+public final class ProfileDatabaseManager {
+    private final Database db;
+
+    public ProfileDatabaseManager(File dataFolder) {
+        db = Database.sqlite(new File(dataFolder, "data.db"));
+        db.executeUpdate("CREATE TABLE IF NOT EXISTS profiles (uuid VARCHAR(36) PRIMARY KEY, coins INT, level INT)");
+    }
+
+    public void loadProfile(Player player) {
+        db.executeQuery("SELECT uuid, coins, level FROM profiles WHERE uuid = ?", UserProfile.class, player.getUniqueId().toString())
+            .thenAcceptSync(profiles -> {
+                if (profiles.isEmpty()) {
+                    createDefaultProfile(player);
+                    return;
+                }
+                
+                UserProfile profile = profiles.getFirst();
+                Text.send(player, "<green>Profile loaded: Level " + profile.level() + " (" + profile.coins() + " coins)</green>");
+            });
+    }
+
+    private void createDefaultProfile(Player player) {
+        db.executeUpdate("INSERT INTO profiles (uuid, coins, level) VALUES (?, 100, 1)", player.getUniqueId().toString())
+            .thenAcceptSync(v -> Text.send(player, "<green>Default profile created!</green>"));
+    }
+
+    public void transferCoins(Player sender, UUID targetUuid, int amount) {
+        db.transaction(ctx -> {
+            var senderRows = ctx.executeQuery("SELECT coins FROM profiles WHERE uuid = ?", sender.getUniqueId().toString());
+            if (senderRows.isEmpty()) {
+                throw new IllegalStateException("Profile not found");
+            }
+            
+            int senderCoins = (int) senderRows.getFirst().get("coins");
+            if (senderCoins < amount) {
+                throw new IllegalStateException("Insufficient balance");
+            }
+
+            ctx.executeUpdate("UPDATE profiles SET coins = coins - ? WHERE uuid = ?", amount, sender.getUniqueId().toString());
+            ctx.executeUpdate("UPDATE profiles SET coins = coins + ? WHERE uuid = ?", amount, targetUuid.toString());
+            
+            return true;
+        }).whenCompleteSync(
+            success -> Text.send(sender, "<green>Transferred " + amount + " coins successfully!</green>"),
+            error -> Text.send(sender, "<red>Transaction aborted: " + error.getMessage() + "</red>")
+        );
+    }
+
+    public void close() {
+        db.close();
+    }
+}
+```
+
+---
+
+## Connection Setup Reference
+
+Establish optimized database connection pools:
+
+### SQLite Connection
 ```java
 import dev.oum.oumlib.database.Database;
 import java.io.File;
 
-// Connects using sensible SQLite defaults
-Database db = Database.sqlite(new File(getDataFolder(), "data.db"));
-```
-
-### SQLite Connection with Custom Hikari Settings
-```java
-Database db = Database.sqlite(new File(getDataFolder(), "data.db"), config -> {
-    config.setConnectionTimeout(10000); // 10 seconds
-});
+public class SqliteConfig {
+    public Database init(File dataFolder) {
+        return Database.sqlite(new File(dataFolder, "data.db"));
+    }
+}
 ```
 
 ### MySQL Connection
-For MySQL, OumLib automatically activates optimized configuration flags (e.g., preparation statement caching, server prep statement usage, and batch rewrite support) to ensure lowest latency.
 ```java
-Database db = Database.mysql("127.0.0.1", 3306, "my_database", "username", "password");
-```
+import dev.oum.oumlib.database.Database;
 
-### MySQL Connection with Custom Hikari Settings
-You can customize Hikari parameters using the config customizer callback:
-```java
-Database db = Database.mysql("127.0.0.1", 3306, "my_database", "username", "password", config -> {
-    config.setMaximumPoolSize(20);
-    config.setMinimumIdle(5);
-    config.setPoolName("MyPlugin-Pool");
-});
-```
-
----
-
-## 2. Executing Updates (DDL/DML)
-
-Use `.executeUpdate(String sql, Object... params)` to run `CREATE TABLE`, `INSERT`, `UPDATE`, or `DELETE` statements asynchronously on virtual threads:
-
-```java
-// Create a table if it does not exist
-db.executeUpdate("CREATE TABLE IF NOT EXISTS players (uuid VARCHAR(36) PRIMARY KEY, coins INT)")
-    .thenAcceptSync(result -> {
-        getLogger().info("Database initialization check complete!");
-    });
-
-// Insert or update player coins
-String playerUuid = player.getUniqueId().toString();
-db.executeUpdate("INSERT INTO players (uuid, coins) VALUES (?, ?) ON DUPLICATE KEY UPDATE coins = ?", 
-    playerUuid, 100, 100);
-```
-
----
-
-## 3. Querying Data
-
-Use `.executeQuery(String sql, Object... params)` to retrieve data. Results are returned as a list of key-value maps representing rows and columns:
-
-```java
-db.executeQuery("SELECT coins FROM players WHERE uuid = ?", player.getUniqueId().toString())
-    .thenAcceptSync(rows -> {
-        if (rows.isEmpty()) {
-            player.sendMessage("No profile found.");
-            return;
-        }
-        
-        // Retrieve values by column name
-        int coins = (int) rows.getFirst().get("coins");
-        player.sendMessage("You have " + coins + " coins!");
-    });
-```
-
----
-
-## 4. Batch Operations
-
-To execute multiple updates in bulk efficiently (e.g., during automatic profile saving), use `.executeBatch(String sql, List<Object[]> parameterBatch)`:
-
-```java
-List<Object[]> batchParams = new ArrayList<>();
-for (Player player : Bukkit.getOnlinePlayers()) {
-    batchParams.add(new Object[] { player.getUniqueId().toString(), 150, 150 });
-}
-
-db.executeBatch("INSERT INTO players (uuid, coins) VALUES (?, ?) ON DUPLICATE KEY UPDATE coins = ?", batchParams)
-    .thenAcceptSync(rowsUpdated -> {
-        getLogger().info("Successfully saved " + rowsUpdated.length + " player records in batch.");
-    });
-```
-
----
-
-## 5. Transactions
-
-Use `.transaction(TransactionContextCallback<R>)` (recommended) to execute multiple queries sequentially within a transaction context. This context exposes the same class-mapping and batch execution helpers as the main `Database` object, executing them synchronously on the active transaction connection.
-
-The wrapper automatically disables auto-commit, commits upon successful execution, and rolls back all operations if any error/exception is encountered.
-
-### High-level Transaction Context (Recommended):
-```java
-db.transaction(ctx -> {
-    // Both statements execute sequentially on the same active transaction connection
-    ctx.executeUpdate("UPDATE players SET coins = coins - 10 WHERE uuid = ?", playerUuid);
-    ctx.executeUpdate("INSERT INTO transactions (uuid, amount) VALUES (?, -10)", playerUuid);
-    
-    // You can retrieve values or maps inside the transaction too
-    return ctx.executeQuery("SELECT coins FROM players WHERE uuid = ?", Integer.class, playerUuid).getFirst();
-}).whenCompleteSync(
-    coins -> getLogger().info("Transaction committed. New balance: " + coins),
-    error -> getLogger().severe("Transaction failed and rolled back: " + error.getMessage())
-);
-```
-
-### Low-level Raw Connection Transaction (Optional):
-For direct JDBC operations, pass a `TransactionCallback<R>` to interact with the raw `Connection` object:
-```java
-db.transaction(conn -> {
-    try (var stmt1 = conn.prepareStatement("UPDATE players SET coins = coins - 10 WHERE uuid = ?");
-         var stmt2 = conn.prepareStatement("INSERT INTO transactions (uuid, amount) VALUES (?, -10)")) {
-        
-        stmt1.setString(1, playerUuid);
-        stmt1.executeUpdate();
-        
-        stmt2.setString(1, playerUuid);
-        stmt2.executeUpdate();
+public class MysqlConfig {
+    public Database init() {
+        return Database.mysql("127.0.0.1", 3306, "my_database", "username", "password", config -> {
+            config.setMaximumPoolSize(10);
+            config.setMinimumIdle(2);
+            config.setPoolName("Plugin-Pool");
+        });
     }
-    return null;
-});
-```
-
----
-
-## 6. Schema Script Execution
-
-Use `.executeScript(String sqlScript)` to execute a multi-statement SQL script (e.g. schema tables setup). It splits statements by semicolons and filters out line (`--`) and block (`/* */`) comments:
-
-```java
-String initScript = 
-    "CREATE TABLE IF NOT EXISTS players (uuid VARCHAR(36) PRIMARY KEY, coins INT);\n" +
-    "CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT);";
-
-db.executeScript(initScript)
-    .thenAcceptSync(v -> getLogger().info("Schema successfully created."));
-```
-
----
-
-## 7. Advanced Integration (Row Mapping & Resource Loading)
-
-### Automatic Class & Record Mapping
-Instead of mapping database fields manually, you can pass a Java `Record` or custom class directly. OumLib will automatically inspect constructor parameters or class fields and map the query result rows directly:
-
-```java
-public record PlayerCoins(String uuid, int coins) {}
-
-// Auto-maps fields in the result set to the record constructor
-db.executeQuery("SELECT uuid, coins FROM players", PlayerCoins.class)
-    .thenAcceptSync(profiles -> {
-        for (PlayerCoins profile : profiles) {
-            getLogger().info(profile.uuid() + " has " + profile.coins() + " coins!");
-        }
-    });
-```
-
-### Manual Mapping with `RowMapper`
-If you need custom mapping behavior (such as custom data type conversions or composite objects), implement a custom `RowMapper`:
-
-```java
-import dev.oum.oumlib.database.RowMapper;
-
-public record PlayerCoins(String uuid, int coins) {}
-
-// Executing and mapping the result set manually
-db.executeQuery("SELECT uuid, coins FROM players", rs -> new PlayerCoins(
-    rs.getString("uuid"),
-    rs.getInt("coins")
-)).thenAcceptSync(profiles -> {
-    for (PlayerCoins profile : profiles) {
-        getLogger().info(profile.uuid() + " has " + profile.coins() + " coins!");
-    }
-});
-```
-
-### Loading SQL Scripts from Plugin Resources
-Instead of hardcoding script strings, you can execute SQL scripts directly from your JAR resource folder (e.g. `schema.sql`) using an `InputStream`:
-
-```java
-import java.io.InputStream;
-
-InputStream schemaStream = getResource("schema.sql");
-if (schemaStream != null) {
-    db.executeScript(schemaStream)
-        .thenAcceptSync(v -> getLogger().info("Database tables initialized from schema.sql!"))
-        .whenCompleteSync(null, err -> getLogger().severe("Failed to initialize database: " + err.getMessage()));
 }
-```
-
----
-
-## 8. Custom ORMs & Raw DataSource Access
-
-If you are using external SQL libraries (like JOOQ, Requery, or MyBatis) or need raw access to the datasource, retrieve it directly:
-
-```java
-import com.zaxxer.hikari.HikariDataSource;
-
-HikariDataSource ds = db.dataSource();
-```
-
-To close the connection pool and release resources on plugin disable:
-```java
-db.close();
 ```
