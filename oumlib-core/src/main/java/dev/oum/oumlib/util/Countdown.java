@@ -32,6 +32,7 @@ public final class Countdown {
     private final Predicate<Integer> displayFilter;
     private int secondsRemaining;
     private TaskHandle task;
+
     @Contract(pure = true)
     private Countdown(@NonNull Builder builder) {
         this.audience = builder.audience;
@@ -54,7 +55,7 @@ public final class Countdown {
             return task;
         }
 
-        task = Scheduler.runRepeating(Duration.ZERO, Duration.ofSeconds(1), () -> {
+        Runnable run = () -> {
             if (secondsRemaining <= 0) {
                 if (onComplete != null) {
                     onComplete.accept(audience);
@@ -85,7 +86,14 @@ public final class Countdown {
             }
 
             secondsRemaining--;
-        });
+        };
+
+        if (audience instanceof Player player) {
+            task = Scheduler.runRepeatingFor(player, Duration.ZERO, Duration.ofSeconds(1), run, () -> {
+            });
+        } else {
+            task = Scheduler.runRepeating(Duration.ZERO, Duration.ofSeconds(1), run);
+        }
 
         return task;
     }
@@ -169,7 +177,7 @@ public final class Countdown {
             return this;
         }
 
-        public @NonNull Builder intervals(int... seconds) {
+        public @NonNull Builder intervals(int @NonNull ... seconds) {
             Set<Integer> set = new HashSet<>();
             for (int s : seconds) {
                 set.add(s);

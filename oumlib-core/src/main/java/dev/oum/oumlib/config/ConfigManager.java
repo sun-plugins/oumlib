@@ -1,6 +1,8 @@
 package dev.oum.oumlib.config;
 
 import dev.oum.oumlib.OumLib;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 
@@ -46,6 +48,10 @@ public final class ConfigManager<T extends Record & ConfigSection> {
     private static Object convertValue(Object val, Class<?> targetType) {
         if (val == null) return null;
         if (targetType.isInstance(val)) return val;
+
+        if (targetType == Component.class) {
+            return MiniMessage.miniMessage().deserialize(String.valueOf(val));
+        }
 
         if (targetType == boolean.class || targetType == Boolean.class) {
             if (val instanceof Boolean b) return b;
@@ -199,8 +205,12 @@ public final class ConfigManager<T extends Record & ConfigSection> {
     }
 
     private static String toYamlValue(Object value) {
-        if (value instanceof String s) return "\"" + s.replace("\"", "\\\"") + "\"";
         if (value == null) return "null";
+        if (value instanceof Component comp) {
+            String s = MiniMessage.miniMessage().serialize(comp);
+            return "\"" + s.replace("\"", "\\\"") + "\"";
+        }
+        if (value instanceof String s) return "\"" + s.replace("\"", "\\\"") + "\"";
         return String.valueOf(value);
     }
 

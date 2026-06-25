@@ -1,5 +1,9 @@
 package dev.oum.oumlib.util;
 
+import dev.oum.oumlib.math.Chance;
+import dev.oum.oumlib.math.FastMath;
+import dev.oum.oumlib.math.Vector3D;
+import dev.oum.oumlib.math.Volume3D;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -7,8 +11,6 @@ import org.bukkit.util.Vector;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-
-import java.util.concurrent.ThreadLocalRandom;
 
 public final class Locations {
 
@@ -84,14 +86,10 @@ public final class Locations {
     }
 
     public static @NonNull Location midpoint(@NonNull Location a, @NonNull Location b) {
-        return new Location(
-                a.getWorld(),
-                (a.getX() + b.getX()) / 2.0,
-                (a.getY() + b.getY()) / 2.0,
-                (a.getZ() + b.getZ()) / 2.0,
-                (a.getYaw() + b.getYaw()) / 2.0f,
-                (a.getPitch() + b.getPitch()) / 2.0f
-        );
+        Vector3D v1 = Vector3D.fromLocation(a);
+        Vector3D v2 = Vector3D.fromLocation(b);
+        Vector3D mid = v1.lerp(v2, 0.5);
+        return mid.toLocation(a.getWorld(), (a.getYaw() + b.getYaw()) / 2.0f, (a.getPitch() + b.getPitch()) / 2.0f);
     }
 
     public static @NonNull Location centerBlock(@NonNull Location block) {
@@ -106,23 +104,18 @@ public final class Locations {
     }
 
     public static boolean isWithinAABB(@NonNull Location loc, @NonNull Location min, @NonNull Location max) {
-        double minX = Math.min(min.getX(), max.getX());
-        double minY = Math.min(min.getY(), max.getY());
-        double minZ = Math.min(min.getZ(), max.getZ());
-        double maxX = Math.max(min.getX(), max.getX());
-        double maxY = Math.max(min.getY(), max.getY());
-        double maxZ = Math.max(min.getZ(), max.getZ());
-
-        return loc.getX() >= minX && loc.getX() <= maxX
-                && loc.getY() >= minY && loc.getY() <= maxY
-                && loc.getZ() >= minZ && loc.getZ() <= maxZ;
+        Volume3D.AABB3D aabb = new Volume3D.AABB3D(
+                new Vector3D(Math.min(min.getX(), max.getX()), Math.min(min.getY(), max.getY()), Math.min(min.getZ(), max.getZ())),
+                new Vector3D(Math.max(min.getX(), max.getX()), Math.max(min.getY(), max.getY()), Math.max(min.getZ(), max.getZ()))
+        );
+        return aabb.contains(Vector3D.fromLocation(loc));
     }
 
     public static @NonNull Location randomInRadius(@NonNull Location center, double radius) {
-        double angle = ThreadLocalRandom.current().nextDouble() * 2 * Math.PI;
-        double r = ThreadLocalRandom.current().nextDouble() * radius;
-        double x = center.getX() + r * Math.cos(angle);
-        double z = center.getZ() + r * Math.sin(angle);
+        double angle = Chance.randomIn(0.0, 2.0 * Math.PI);
+        double r = Chance.randomIn(0.0, radius);
+        double x = center.getX() + r * FastMath.cos(angle);
+        double z = center.getZ() + r * FastMath.sin(angle);
         return new Location(center.getWorld(), x, center.getY(), z, center.getYaw(), center.getPitch());
     }
 }

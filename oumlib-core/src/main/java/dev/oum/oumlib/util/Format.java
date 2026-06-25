@@ -1,5 +1,6 @@
 package dev.oum.oumlib.util;
 
+import dev.oum.oumlib.math.FormatMath;
 import org.jspecify.annotations.NonNull;
 
 import java.text.DecimalFormat;
@@ -11,9 +12,6 @@ import java.util.regex.Pattern;
 public final class Format {
 
     private static final DecimalFormat NUMBER_FORMAT = new DecimalFormat("#,###.##");
-    private static final String[] SUFFIXES = {"", "k", "M", "B", "T"};
-    private static final int[] ROMAN_VALUES = {1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1};
-    private static final String[] ROMAN_SYMBOLS = {"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"};
 
     private Format() {
     }
@@ -54,9 +52,7 @@ public final class Format {
     }
 
     public static String compactNumber(double number) {
-        if (number < 1000) return String.valueOf((int) number);
-        int exp = (int) (Math.log(number) / Math.log(1000));
-        return String.format("%.1f%s", number / Math.pow(1000, exp), SUFFIXES[exp]);
+        return FormatMath.compact(number);
     }
 
     public static @NonNull Duration parseDuration(@NonNull String input) {
@@ -94,15 +90,7 @@ public final class Format {
 
     public static @NonNull String roman(int number) {
         if (number <= 0) return "";
-        StringBuilder sb = new StringBuilder();
-        int remaining = number;
-        for (int i = 0; i < ROMAN_VALUES.length; i++) {
-            while (remaining >= ROMAN_VALUES[i]) {
-                sb.append(ROMAN_SYMBOLS[i]);
-                remaining -= ROMAN_VALUES[i];
-            }
-        }
-        return sb.toString();
+        return FormatMath.toRoman(number);
     }
 
     public static @NonNull String ordinal(int number) {

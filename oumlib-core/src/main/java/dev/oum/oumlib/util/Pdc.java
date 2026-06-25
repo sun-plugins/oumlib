@@ -2,6 +2,8 @@ package dev.oum.oumlib.util;
 
 import com.google.gson.Gson;
 import dev.oum.oumlib.OumLib;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -238,6 +240,30 @@ public final class Pdc {
         public long getLongOrDefault(@NonNull NamespacedKey key, long def) {
             Long val = getLong(key);
             return val != null ? val : def;
+        }
+
+        public @NonNull PdcHolder setComponent(@NonNull String key, @Nullable Component value) {
+            return setComponent(nsk(key), value);
+        }
+
+        public @NonNull PdcHolder setComponent(@NonNull NamespacedKey key, @Nullable Component value) {
+            Component oldValue = getComponent(key);
+            if (value == null) {
+                pdc.remove(key);
+            } else {
+                pdc.set(key, PersistentDataType.STRING, MiniMessage.miniMessage().serialize(value));
+            }
+            triggerListeners(holder, key, oldValue, value);
+            return this;
+        }
+
+        public @Nullable Component getComponent(@NonNull String key) {
+            return getComponent(nsk(key));
+        }
+
+        public @Nullable Component getComponent(@NonNull NamespacedKey key) {
+            String val = pdc.get(key, PersistentDataType.STRING);
+            return val != null ? MiniMessage.miniMessage().deserialize(val) : null;
         }
 
         public @NonNull PdcHolder setList(@NonNull String key, @Nullable List<String> value) {
@@ -587,6 +613,35 @@ public final class Pdc {
             if (raw == null) return null;
             if (raw.isEmpty()) return List.of();
             return Arrays.asList(GSON.fromJson(raw, String[].class));
+        }
+
+        public @NonNull PdcItem setComponent(@NonNull String key, @Nullable Component value) {
+            return setComponent(nsk(key), value);
+        }
+
+        public @NonNull PdcItem setComponent(@NonNull NamespacedKey key, @Nullable Component value) {
+            Component oldValue = getComponent(key);
+            updateMeta(meta -> {
+                if (value == null) {
+                    meta.getPersistentDataContainer().remove(key);
+                } else {
+                    meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, MiniMessage.miniMessage().serialize(value));
+                }
+            });
+            triggerListeners(item, key, oldValue, value);
+            return this;
+        }
+
+        public @Nullable Component getComponent(@NonNull String key) {
+            return getComponent(nsk(key));
+        }
+
+        public @Nullable Component getComponent(@NonNull NamespacedKey key) {
+            if (!item.hasItemMeta()) return null;
+            ItemMeta meta = item.getItemMeta();
+            if (meta == null) return null;
+            String val = meta.getPersistentDataContainer().get(key, PersistentDataType.STRING);
+            return val != null ? MiniMessage.miniMessage().deserialize(val) : null;
         }
 
         public <T> @NonNull PdcItem setObject(@NonNull String key, @Nullable T value) {

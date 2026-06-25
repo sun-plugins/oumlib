@@ -1,10 +1,15 @@
 package dev.oum.oumlib.effect;
 
+import dev.oum.oumlib.math.Geometry3D;
+import dev.oum.oumlib.math.Vector3D;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Particle;
+import org.bukkit.World;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+
+import java.util.List;
 
 public final class Particles {
 
@@ -58,5 +63,44 @@ public final class Particles {
 
     public static void spawnDustTransition(@NonNull Location loc, @NonNull Color fromColor, @NonNull Color toColor, float size, int count, double offsetX, double offsetY, double offsetZ) {
         spawn(loc, Particle.DUST_COLOR_TRANSITION, count, offsetX, offsetY, offsetZ, 1, new Particle.DustTransition(fromColor, toColor, size));
+    }
+
+    public static void spawnLine(@NonNull Location start, @NonNull Location end,
+                                 @NonNull ParticleBuilder builder, int segments) {
+        Vector3D startV = Vector3D.fromLocation(start);
+        Vector3D endV = Vector3D.fromLocation(end);
+        World world = start.getWorld();
+        if (world == null) return;
+        for (int i = 0; i <= segments; i++) {
+            Vector3D pt = startV.lerp(endV, (double) i / segments);
+            builder.spawn(pt.toLocation(world));
+        }
+    }
+
+    public static void spawnBezier(@NonNull Location start, @NonNull Location control1,
+                                   @NonNull Location control2, @NonNull Location end,
+                                   @NonNull ParticleBuilder builder, int segments) {
+        Vector3D startV = Vector3D.fromLocation(start);
+        Vector3D c1 = Vector3D.fromLocation(control1);
+        Vector3D c2 = Vector3D.fromLocation(control2);
+        Vector3D endV = Vector3D.fromLocation(end);
+        List<Vector3D> points = Geometry3D.bezier(startV, c1, c2, endV, segments);
+        World world = start.getWorld();
+        if (world == null) return;
+        for (Vector3D pt : points) {
+            builder.spawn(pt.toLocation(world));
+        }
+    }
+
+    public static void spawnHelix(@NonNull Location center, double radius,
+                                  double pitch, double height, int steps,
+                                  @NonNull ParticleBuilder builder) {
+        Vector3D centerV = Vector3D.fromLocation(center);
+        List<Vector3D> points = Geometry3D.helix(centerV, radius, pitch, height, steps);
+        World world = center.getWorld();
+        if (world == null) return;
+        for (Vector3D pt : points) {
+            builder.spawn(pt.toLocation(world));
+        }
     }
 }

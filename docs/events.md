@@ -1,129 +1,112 @@
-# Event System
+# Events & Listeners Bus
 
-OumLib features a modern, fluent event bus wrapper. It provides cleaner listener registration, custom conditional filtering, execution boundaries, and platform-level lifecycle management.
+OumLib features a modern, fluent event bus wrapper. It provides cleaner listener registration, conditional filtering, execution boundaries, and unregistration hooks.
 
 ---
 
-## 1. Registration & Custom Filtering
+## Real-world Example: Combat Tagging System
 
-Use `.filter(...)` to add condition checks to your event listener. The callback handler will only execute if all filter checks return `true`.
-
-```java
-import dev.oum.oumlib.event.Events;
-import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.inventory.EquipmentSlot;
-
-Events.listen(PlayerInteractEvent.class)
-    // Filter out off-hand clicks
-    .filter(event -> event.getHand() == EquipmentSlot.HAND)
-    // Filter to only trigger if the player is holding a diamond sword
-    .filter(event -> event.getPlayer().getInventory().getItemInMainHand().getType().name().contains("DIAMOND_SWORD"))
-    .handler(event -> {
-        event.getPlayer().sendMessage("You swung a diamond sword!");
-    });
-```
-
-### Player-Specific Filtering (Multi-Platform)
-If you need to listen for events triggered specifically by a particular player (e.g. during a minigame, a chat prompt session, or an active GUI menu context), you can use `.playerFilter(extractor, condition)` on `EventBuilder`. This is fully platform-independent and type-safe:
+Here is a combat tagging module that flags players in combat upon entity damage, blocks teleportation requests, intercepts quit actions, and automatically expires when players log off or combat times out:
 
 ```java
 import dev.oum.oumlib.event.Events;
-import org.bukkit.event.player.PlayerInteractEvent;
+import dev.oum.oumlib.text.Text;
 import org.bukkit.entity.Player;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
+import java.time.Duration;
+import java.util.HashSet;
+import java.util.Set;
 
-Player targetPlayer = ...;
+public final class CombatTagManager {
+    private final Set<Player> activeCombat = new HashSet<>();
 
-Events.listen(PlayerInteractEvent.class)
-    .playerFilter(PlayerInteractEvent::getPlayer, player -> player.equals(targetPlayer))
-    .handler(event -> {
-        event.getPlayer().sendMessage("You interacted!");
-    });
+    public void initialize() {
+        Events.listen(EntityDamageByEntityEvent.class)
+            .filter(event -> event.getEntity() instanceof Player)
+            .filter(event -> event.getDamager() instanceof Player)
+            .handler(event -> {
+                Player victim = (Player) event.getEntity();
+                Player attacker = (Player) event.getDamager();
+                
+                tagPlayer(victim);
+                tagPlayer(attacker);
+            });
+
+        Events.listen(PlayerTeleportEvent.class)
+            .filter(event -> activeCombat.contains(event.getPlayer()))
+            .filter(event -> event.getCause() == PlayerTeleportEvent.TeleportCause.COMMAND)
+            .handler(event -> {
+                event.setCancelled(true);
+                Text.send(event.getPlayer(), "<red>You cannot teleport while in combat!</red>");
+            });
+    }
+
+    private void tagPlayer(Player player) {
+        if (activeCombat.add(player)) {
+            Text.send(player, "<red>You are now in combat! Do not log out.</red>");
+            
+            Events.listen(PlayerQuitEvent.class)
+                .playerFilter(PlayerQuitEvent::getPlayer, p -> p.equals(player))
+                .maxFires(1)
+                .expireAfter(Duration.ofSeconds(15))
+                .handler(event -> {
+                    System.out.println(player.getName() + " logged out while in combat!");
+                    activeCombat.remove(player);
+                });
+
+            Events.listen(PlayerQuitEvent.class)
+                .playerFilter(PlayerQuitEvent::getPlayer, p -> p.equals(player))
+                .expireAfter(Duration.ofSeconds(15))
+                .expireIf(event -> !activeCombat.contains(player))
+                .handler(event -> activeCombat.remove(player));
+        }
+    }
+}
 ```
-
-On Velocity, this works exactly the same with Velocity's `Player` class and proxy events:
-
-```java
-import dev.oum.oumlib.event.Events;
-import com.velocitypowered.api.event.player.PlayerChatEvent;
-import com.velocitypowered.api.proxy.Player;
-
-Player targetPlayer = ...;
-
-Events.listen(PlayerChatEvent.class)
-    .playerFilter(PlayerChatEvent::getPlayer, player -> player.equals(targetPlayer))
-    .handler(event -> {
-        // This only fires for targetPlayer
-    });
-```
-
-> [!NOTE]
-> The legacy class `BukkitEvents` (e.g. `BukkitEvents.listenFor(...)`) has been deprecated since version `1.0.7` and is scheduled for removal. Please migrate to using `.playerFilter(...)` on the standard `Events.listen(...)` builder.
 
 ---
 
-## 3. Cancellable Events & State Handling
+## Cancellable Events & State Handling
 
-You can configure how the event listener behaves regarding cancelled events:
-- **`ignoreCancelled()`**: The listener will skip execution if another plugin has already cancelled the event.
-- **`onlyIfCancelled()`**: The listener will *only* fire if the event has already been cancelled by another plugin.
+Configure how the event listener behaves regarding cancelled events:
+- **`ignoreCancelled()`**: Skip execution if another plugin has already cancelled the event.
+- **`onlyIfCancelled()`**: Only fire if the event has already been cancelled.
 
 ```java
+import dev.oum.oumlib.event.Events;
 import org.bukkit.event.block.BlockBreakEvent;
 
-Events.listen(BlockBreakEvent.class)
-    .ignoreCancelled() // Skip if block break is protected/cancelled
-    .handler(event -> {
-        System.out.println("A block was successfully broken by " + event.getPlayer().getName());
-    });
+public class BlockLogger {
+    public void register() {
+        Events.listen(BlockBreakEvent.class)
+            .ignoreCancelled()
+            .handler(event -> {
+                System.out.println("Block broken: " + event.getBlock().getType());
+            });
+    }
+}
 ```
 
 ---
 
-## 4. Automatic Unregistration & Memory Protection
+## Asynchronous Thread Listeners
 
-To avoid memory leaks, you can configure listeners to unregister themselves automatically when certain thresholds or conditions are reached:
-- **`maxFires(int count)`**: Automatically cleans up and unregisters the listener after it executes a set number of times.
-- **`expireAfter(Duration duration)`**: Automatically unregisters the listener after a set period of time has elapsed since registration.
-- **`expireIf(Predicate<E> condition)`**: Evaluates a custom condition on each event execution, unregistering the listener immediately if the predicate returns `true`.
+Offload heavy I/O calculations (like database calls) to async thread pools:
 
 ```java
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.AsyncPlayerChatEvent;
-import java.time.Duration;
+import dev.oum.oumlib.event.Events;
+import org.bukkit.event.player.PlayerInteractEvent;
 
-// 1. Fire-once or timed expiration
-Events.listen(PlayerQuitEvent.class)
-    .maxFires(1) // Runs once, then cleans up. Perfect for single-event wait loops.
-    .expireAfter(Duration.ofMinutes(10)) // Automatically unregisters after 10 minutes
-    .handler(event -> {
-        System.out.println("This message will print for at most one quit event within the next 10 minutes.");
-    });
-
-// 2. Conditional expiration (e.g. stop intercepting chat once user types 'exit')
-Events.listen(AsyncPlayerChatEvent.class)
-    .filter(event -> event.getPlayer().equals(targetPlayer))
-    .expireIf(event -> event.getMessage().equalsIgnoreCase("exit"))
-    .handler(event -> {
-        targetPlayer.sendMessage("Intercepted message: " + event.getMessage());
-        event.setCancelled(true);
-    });
+public class AsyncLogger {
+    public void register() {
+        Events.listen(PlayerInteractEvent.class)
+            .async()
+            .handler(event -> {
+                System.out.println("Processing heavy interaction logs on virtual threads.");
+            });
+    }
+}
 ```
-
----
-
-## 5. Thread Safety & Folia Compatibility
-
-- **Paper/Spigot**: Event handlers run synchronously on the server's main tick thread (the standard Bukkit behavior), unless the event itself is marked as asynchronous (e.g. `AsyncChatEvent`).
-- **Velocity**: Event handlers are run asynchronously on Netty thread pools. Velocity events do not run on a single main thread.
-- **Folia**: Folia runs events on the thread executing the region tick where the event occurred. Since region tick threads change dynamically, ensure any external data mutations triggered inside your handlers are thread-safe (e.g. using `ConcurrentHashMap` or thread-safe atomic variables).
-
-### Asynchronous Listener Support
-To execute listener code on a background thread pool (or virtual thread on Paper/Folia), chain `.async()` on the builder:
-```java
-Events.listen(PlayerInteractEvent.class)
-    .async() // Offloads execution to virtual/async threads
-    .handler(event -> {
-        // Safe to execute blocking database lookups or HTTP webhooks
-        // Note: Event modification/cancellation is not supported in async mode
-    });
-```
+*Note: Event modification/cancellation is not supported in async mode.*

@@ -1,8 +1,6 @@
 package dev.oum.oumlib.util;
 
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.util.io.BukkitObjectInputStream;
-import org.bukkit.util.io.BukkitObjectOutputStream;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -10,23 +8,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.lang.reflect.Method;
 import java.util.Base64;
 
 public final class ItemSerializer {
-
-    private static Method serializeAsBytesMethod;
-    private static Method deserializeBytesMethod;
-    private static boolean paperBytesSupported = false;
-
-    static {
-        try {
-            serializeAsBytesMethod = ItemStack.class.getMethod("serializeAsBytes");
-            deserializeBytesMethod = ItemStack.class.getMethod("deserializeBytes", byte[].class);
-            paperBytesSupported = true;
-        } catch (NoSuchMethodException ignored) {
-        }
-    }
 
     private ItemSerializer() {
     }
@@ -34,7 +18,7 @@ public final class ItemSerializer {
     public static @NonNull String serialize(@Nullable ItemStack item) {
         if (item == null || item.isEmpty()) return "";
         try {
-            byte[] bytes = serializeToBytes(item);
+            byte[] bytes = item.serializeAsBytes();
             return Base64.getEncoder().encodeToString(bytes);
         } catch (Exception e) {
             throw new RuntimeException("Failed to serialize ItemStack", e);
@@ -45,7 +29,7 @@ public final class ItemSerializer {
         if (base64.isEmpty()) return null;
         try {
             byte[] bytes = Base64.getDecoder().decode(base64);
-            return deserializeFromBytes(bytes);
+            return ItemStack.deserializeBytes(bytes);
         } catch (Exception e) {
             throw new RuntimeException("Failed to deserialize ItemStack", e);
         }
@@ -59,7 +43,7 @@ public final class ItemSerializer {
                 if (item == null || item.isEmpty()) {
                     dos.writeInt(-1);
                 } else {
-                    byte[] bytes = serializeToBytes(item);
+                    byte[] bytes = item.serializeAsBytes();
                     dos.writeInt(bytes.length);
                     dos.write(bytes);
                 }
@@ -85,36 +69,13 @@ public final class ItemSerializer {
                     } else {
                         byte[] itemBytes = new byte[size];
                         dis.readFully(itemBytes);
-                        items[i] = deserializeFromBytes(itemBytes);
+                        items[i] = ItemStack.deserializeBytes(itemBytes);
                     }
                 }
                 return items;
             }
         } catch (Exception e) {
             throw new RuntimeException("Failed to deserialize ItemStack array", e);
-        }
-    }
-
-    @SuppressWarnings("deprecation")
-    private static byte[] serializeToBytes(@NonNull ItemStack item) throws Exception {
-        if (paperBytesSupported) {
-            return (byte[]) serializeAsBytesMethod.invoke(item);
-        }
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
-             BukkitObjectOutputStream boos = new BukkitObjectOutputStream(baos)) {
-            boos.writeObject(item);
-            return baos.toByteArray();
-        }
-    }
-
-    @SuppressWarnings("deprecation")
-    private static @NonNull ItemStack deserializeFromBytes(byte @NonNull [] bytes) throws Exception {
-        if (paperBytesSupported) {
-            return (ItemStack) deserializeBytesMethod.invoke(null, (Object) bytes);
-        }
-        try (ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
-             BukkitObjectInputStream bois = new BukkitObjectInputStream(bais)) {
-            return (ItemStack) bois.readObject();
         }
     }
 }

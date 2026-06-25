@@ -23,9 +23,9 @@ import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -39,9 +39,9 @@ public final class AnvilMenu implements Menu {
     private final String placeholder;
     private final BiConsumer<Player, String> onConfirm;
     private final Consumer<Player> onClose;
-    private final Map<UUID, Inventory> open = new HashMap<>();
-    private final Map<UUID, Integer> originalLevels = new HashMap<>();
-    private final Map<UUID, Float> originalExp = new HashMap<>();
+    private final Map<UUID, Inventory> open = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> originalLevels = new ConcurrentHashMap<>();
+    private final Map<UUID, Float> originalExp = new ConcurrentHashMap<>();
 
     private ListenerHandle clickHandle;
     private ListenerHandle closeHandle;
@@ -63,29 +63,33 @@ public final class AnvilMenu implements Menu {
 
     @Override
     public void open(@NonNull Player player) {
-        Inventory inv = player.getServer().createInventory(player, InventoryType.ANVIL, MM.deserialize(title));
-        inv.setItem(0, ItemBuilder.of(Material.PAPER).name(placeholder).build());
+        Scheduler.runFor(player, () -> {
+            Inventory inv = player.getServer().createInventory(player, InventoryType.ANVIL, MM.deserialize(title));
+            inv.setItem(0, ItemBuilder.of(Material.PAPER).name(placeholder).build());
 
-        originalLevels.put(player.getUniqueId(), player.getLevel());
-        originalExp.put(player.getUniqueId(), player.getExp());
-        if (player.getLevel() < 1) {
-            player.setLevel(1);
-            player.setExp(0.0f);
-        }
+            originalLevels.put(player.getUniqueId(), player.getLevel());
+            originalExp.put(player.getUniqueId(), player.getExp());
+            if (player.getLevel() < 1) {
+                player.setLevel(1);
+                player.setExp(0.0f);
+            }
 
-        open.put(player.getUniqueId(), inv);
-        registerListeners();
-        player.openInventory(inv);
+            open.put(player.getUniqueId(), inv);
+            registerListeners();
+            player.openInventory(inv);
+        });
     }
 
     @Override
     public void close(@NonNull Player player) {
-        open.remove(player.getUniqueId());
-        restoreExperience(player);
-        player.closeInventory();
-        if (open.isEmpty()) {
-            unregisterListeners();
-        }
+        Scheduler.runFor(player, () -> {
+            open.remove(player.getUniqueId());
+            restoreExperience(player);
+            player.closeInventory();
+            if (open.isEmpty()) {
+                unregisterListeners();
+            }
+        });
     }
 
     private void restoreExperience(@NonNull Player player) {

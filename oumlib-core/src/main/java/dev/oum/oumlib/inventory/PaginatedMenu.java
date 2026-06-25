@@ -2,6 +2,7 @@ package dev.oum.oumlib.inventory;
 
 import dev.oum.oumlib.event.Events;
 import dev.oum.oumlib.event.ListenerHandle;
+import dev.oum.oumlib.scheduler.Scheduler;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
@@ -16,7 +17,11 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 public final class PaginatedMenu implements Menu {
@@ -32,8 +37,8 @@ public final class PaginatedMenu implements Menu {
     private final Function<Integer, ItemStack> nextButton;
     private final Function<Player, List<ItemStack>> itemsSupplier;
     private final PaginatedClickHandler clickHandler;
-    private final Map<UUID, Integer> pages = new HashMap<>();
-    private final Map<UUID, Inventory> open = new HashMap<>();
+    private final Map<UUID, Integer> pages = new ConcurrentHashMap<>();
+    private final Map<UUID, Inventory> open = new ConcurrentHashMap<>();
 
     private ListenerHandle clickHandle;
     private ListenerHandle closeHandle;
@@ -72,57 +77,64 @@ public final class PaginatedMenu implements Menu {
 
     @Override
     public void open(@NonNull Player player) {
-        pages.putIfAbsent(player.getUniqueId(), 1);
-        registerListeners();
-        reopen(player);
+        Scheduler.runFor(player, () -> {
+            pages.putIfAbsent(player.getUniqueId(), 1);
+            registerListeners();
+            reopen(player);
+        });
     }
 
     @Override
     public void close(@NonNull Player player) {
-        open.remove(player.getUniqueId());
-        pages.remove(player.getUniqueId());
-        player.closeInventory();
-        if (open.isEmpty()) {
-            unregisterListeners();
-        }
+        Scheduler.runFor(player, () -> {
+            open.remove(player.getUniqueId());
+            pages.remove(player.getUniqueId());
+            player.closeInventory();
+            if (open.isEmpty()) {
+                unregisterListeners();
+            }
+        });
     }
 
     @SuppressWarnings("unused")
     public void refresh(@NonNull Player player) {
-        Inventory inv = open.get(player.getUniqueId());
-        if (inv == null) return;
-        populateItems(player, inv, pages.getOrDefault(player.getUniqueId(), 1));
-        player.updateInventory();
+        Scheduler.runFor(player, () -> {
+            Inventory inv = open.get(player.getUniqueId());
+            if (inv == null) return;
+            populateItems(player, inv, pages.getOrDefault(player.getUniqueId(), 1));
+            player.updateInventory();
+        });
     }
 
-    @SuppressWarnings("deprecation")
     private void reopen(@NonNull Player player) {
-        int page = pages.getOrDefault(player.getUniqueId(), 1);
-        String resolvedTitle = title
-                .replace("<page>", String.valueOf(page))
-                .replace("<total>", String.valueOf(totalPages(player)));
-        var titleComponent = MM.deserialize(resolvedTitle);
+        Scheduler.runFor(player, () -> {
+            int page = pages.getOrDefault(player.getUniqueId(), 1);
+            String resolvedTitle = title
+                    .replace("<page>", String.valueOf(page))
+                    .replace("<total>", String.valueOf(totalPages(player)));
+            var titleComponent = MM.deserialize(resolvedTitle);
 
-        Inventory inv = open.get(player.getUniqueId());
-        if (inv != null) {
-            try {
-                var view = player.getOpenInventory();
+            Inventory inv = open.get(player.getUniqueId());
+            if (inv != null) {
                 try {
-                    var method = view.getClass().getMethod("setTitle", Component.class);
-                    method.invoke(view, titleComponent);
-                } catch (NoSuchMethodException e) {
-                    view.setTitle(resolvedTitle);
+                    var view = player.getOpenInventory();
+                    try {
+                        var method = view.getClass().getMethod("setTitle", Component.class);
+                        method.invoke(view, titleComponent);
+                    } catch (NoSuchMethodException e) {
+                        view.setTitle(resolvedTitle);
+                    }
+                } catch (Exception ignored) {
                 }
-            } catch (Exception ignored) {
+                populateItems(player, inv, page);
+                player.updateInventory();
+            } else {
+                inv = Bukkit.createInventory(null, rows * 9, titleComponent);
+                populateItems(player, inv, page);
+                open.put(player.getUniqueId(), inv);
+                player.openInventory(inv);
             }
-            populateItems(player, inv, page);
-            player.updateInventory();
-        } else {
-            inv = Bukkit.createInventory(null, rows * 9, titleComponent);
-            populateItems(player, inv, page);
-            open.put(player.getUniqueId(), inv);
-            player.openInventory(inv);
-        }
+        });
     }
 
     private void populateItems(@NonNull Player player, @NonNull Inventory inv, int page) {

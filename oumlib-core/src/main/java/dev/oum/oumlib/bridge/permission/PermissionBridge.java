@@ -1,6 +1,7 @@
 package dev.oum.oumlib.bridge.permission;
 
 import dev.oum.oumlib.OumLib;
+import dev.oum.oumlib.scheduler.Promise;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.model.user.User;
@@ -27,6 +28,18 @@ interface PermissionHandler {
     List<String> getGroups(UUID uuid);
 
     void setGroups(UUID uuid, List<String> groups, String primaryGroup);
+
+    Promise<String> getPrimaryGroupAsync(UUID uuid);
+
+    Promise<String> getPrefixAsync(UUID uuid);
+
+    Promise<String> getSuffixAsync(UUID uuid);
+
+    Promise<String> getMetaValueAsync(UUID uuid, String key);
+
+    Promise<List<String>> getGroupsAsync(UUID uuid);
+
+    Promise<Void> setGroupsAsync(UUID uuid, List<String> groups, String primaryGroup);
 }
 
 public final class PermissionBridge {
@@ -109,10 +122,44 @@ public final class PermissionBridge {
             h.setGroups(uuid, groups, primaryGroup);
         }
     }
+
+    public static @Nullable Promise<String> getPrimaryGroupAsync(@NonNull UUID uuid) {
+        PermissionHandler h = getHandler();
+        return h != null ? h.getPrimaryGroupAsync(uuid) : null;
+    }
+
+    public static @Nullable Promise<String> getPrefixAsync(@NonNull UUID uuid) {
+        PermissionHandler h = getHandler();
+        return h != null ? h.getPrefixAsync(uuid) : null;
+    }
+
+    public static @Nullable Promise<String> getSuffixAsync(@NonNull UUID uuid) {
+        PermissionHandler h = getHandler();
+        return h != null ? h.getSuffixAsync(uuid) : null;
+    }
+
+    public static @Nullable Promise<String> getMetaValueAsync(@NonNull UUID uuid, @NonNull String key) {
+        PermissionHandler h = getHandler();
+        return h != null ? h.getMetaValueAsync(uuid, key) : null;
+    }
+
+    public static @Nullable Promise<List<String>> getGroupsAsync(@NonNull UUID uuid) {
+        PermissionHandler h = getHandler();
+        return h != null ? h.getGroupsAsync(uuid) : null;
+    }
+
+    public static @Nullable Promise<Void> setGroupsAsync(@NonNull UUID uuid, @NonNull List<String> groups, @Nullable String primaryGroup) {
+        PermissionHandler h = getHandler();
+        return h != null ? h.setGroupsAsync(uuid, groups, primaryGroup) : null;
+    }
 }
 
 class LuckPermsHandler implements PermissionHandler {
     private final LuckPerms api = LuckPermsProvider.get();
+
+    private Promise<User> loadUser(UUID uuid) {
+        return Promise.fromCompletableFuture(api.getUserManager().loadUser(uuid));
+    }
 
     @Override
     public String getPrimaryGroup(UUID uuid) {
@@ -166,6 +213,54 @@ class LuckPermsHandler implements PermissionHandler {
                 user.setPrimaryGroup(primaryGroup);
             }
             api.getUserManager().saveUser(user);
+        });
+    }
+
+    @Override
+    public Promise<String> getPrimaryGroupAsync(UUID uuid) {
+        return loadUser(uuid).map(User::getPrimaryGroup);
+    }
+
+    @Override
+    public Promise<String> getPrefixAsync(UUID uuid) {
+        return loadUser(uuid).map(user -> user.getCachedData().getMetaData().getPrefix());
+    }
+
+    @Override
+    public Promise<String> getSuffixAsync(UUID uuid) {
+        return loadUser(uuid).map(user -> user.getCachedData().getMetaData().getSuffix());
+    }
+
+    @Override
+    public Promise<String> getMetaValueAsync(UUID uuid, String key) {
+        return loadUser(uuid).map(user -> user.getCachedData().getMetaData().getMetaValue(key));
+    }
+
+    @Override
+    public Promise<List<String>> getGroupsAsync(UUID uuid) {
+        return loadUser(uuid).map(user -> {
+            List<String> groups = new ArrayList<>();
+            for (Node node : user.getNodes()) {
+                if (node instanceof InheritanceNode inheritanceNode) {
+                    groups.add(inheritanceNode.getGroupName());
+                }
+            }
+            return groups;
+        });
+    }
+
+    @Override
+    public Promise<Void> setGroupsAsync(UUID uuid, List<String> groups, String primaryGroup) {
+        return loadUser(uuid).map(user -> {
+            user.data().clear(NodeType.INHERITANCE::matches);
+            for (String group : groups) {
+                user.data().add(InheritanceNode.builder(group).build());
+            }
+            if (primaryGroup != null) {
+                user.setPrimaryGroup(primaryGroup);
+            }
+            api.getUserManager().saveUser(user);
+            return null;
         });
     }
 }

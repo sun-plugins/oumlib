@@ -26,7 +26,6 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
-import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -285,6 +284,17 @@ public final class ItemBuilder {
     }
 
     @CheckReturnValue
+    public @NonNull ItemBuilder pdc(@NonNull String key, @Nullable Component value) {
+        NamespacedKey nsk = new NamespacedKey(OumLib.plugin(), key);
+        if (value == null) {
+            meta.getPersistentDataContainer().remove(nsk);
+        } else {
+            meta.getPersistentDataContainer().set(nsk, PersistentDataType.STRING, MM.serialize(value));
+        }
+        return this;
+    }
+
+    @CheckReturnValue
     @SuppressWarnings("unused")
     public @NonNull ItemBuilder skull(@NonNull OfflinePlayer player) {
         if (meta instanceof SkullMeta skullMeta) {
@@ -325,22 +335,7 @@ public final class ItemBuilder {
                 textures.setSkin(url);
                 profile.setTextures(textures);
                 skullMeta.setPlayerProfile(profile);
-            } catch (Throwable t) {
-                try {
-                    Class<?> gameProfileClass = Class.forName("com.mojang.authlib.GameProfile");
-                    Class<?> propertyClass = Class.forName("com.mojang.authlib.properties.Property");
-                    Object profile = gameProfileClass.getConstructor(UUID.class, String.class)
-                            .newInstance(UUID.randomUUID(), null);
-                    Object property = propertyClass.getConstructor(String.class, String.class)
-                            .newInstance("textures", textureValue);
-                    Object properties = gameProfileClass.getMethod("getProperties").invoke(profile);
-                    properties.getClass().getMethod("put", Object.class, Object.class).invoke(properties, "textures", property);
-
-                    Field profileField = skullMeta.getClass().getDeclaredField("profile");
-                    profileField.setAccessible(true);
-                    profileField.set(skullMeta, profile);
-                } catch (Throwable ignored) {
-                }
+            } catch (Throwable ignored) {
             }
         }
         return this;

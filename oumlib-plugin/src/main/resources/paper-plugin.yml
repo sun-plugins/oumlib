@@ -1,7 +1,0 @@
-name: OumLib
-version: 1.0.7
-main: dev.oum.oumlib.plugin.PaperOumLibPlugin
-api-version: '1.21.4'
-folia-supported: true
-author: sun-mc-dev
-description: Provided plugin library for OumLib.

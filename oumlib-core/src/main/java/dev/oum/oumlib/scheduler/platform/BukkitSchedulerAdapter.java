@@ -111,17 +111,115 @@ public final class BukkitSchedulerAdapter implements SchedulerAdapter {
         return run(task);
     }
 
-    @Contract("_, _ -> new")
+    @Contract("_, _, _ -> new")
     @Override
-    public @NonNull TaskHandle runFor(Object entity, Runnable task) {
-        if (entity instanceof Entity ent) {
+    public @NonNull TaskHandle runLaterAt(Object location, Duration delay, Runnable task) {
+        return runLaterAt(location, toTicks(delay), task);
+    }
+
+    @Contract("_, _, _ -> new")
+    @Override
+    public @NonNull TaskHandle runLaterAt(Object location, long ticks, Runnable task) {
+        if (location instanceof Location loc) {
             if (FOLIA) {
-                var scheduled = ent.getScheduler().run(plugin, t -> task.run(), null);
-                assert scheduled != null;
+                var scheduled = Bukkit.getRegionScheduler().runDelayed(plugin, loc, t -> task.run(), ticks);
                 return new TaskHandle(scheduled::cancel, scheduled::isCancelled);
             }
         }
+        return runLater(ticks, task);
+    }
+
+    @Contract("_, _, _, _ -> new")
+    @Override
+    public @NonNull TaskHandle runRepeatingAt(Object location, Duration initialDelay, Duration period, Runnable task) {
+        return runRepeatingAt(location, toTicks(initialDelay), toTicks(period), task);
+    }
+
+    @Contract("_, _, _, _ -> new")
+    @Override
+    public @NonNull TaskHandle runRepeatingAt(Object location, long initialTicks, long periodTicks, Runnable task) {
+        if (location instanceof Location loc) {
+            if (FOLIA) {
+                var scheduled = Bukkit.getRegionScheduler().runAtFixedRate(plugin, loc, t -> task.run(), initialTicks, periodTicks);
+                return new TaskHandle(scheduled::cancel, scheduled::isCancelled);
+            }
+        }
+        return runRepeating(initialTicks, periodTicks, task);
+    }
+
+    @Contract("_, _ -> new")
+    @Override
+    public @NonNull TaskHandle runFor(Object entity, Runnable task) {
+        return runLaterFor(entity, 0L, task, null);
+    }
+
+    @Contract("_, _, _, _ -> new")
+    @Override
+    public @NonNull TaskHandle runLaterFor(Object entity, Duration delay, Runnable task, Runnable retired) {
+        return runLaterFor(entity, toTicks(delay), task, retired);
+    }
+
+    @Contract("_, _, _, _ -> new")
+    @Override
+    public @NonNull TaskHandle runLaterFor(Object entity, long ticks, Runnable task, Runnable retired) {
+        if (entity instanceof Entity ent) {
+            if (FOLIA) {
+                var scheduled = ent.getScheduler().runDelayed(plugin, t -> task.run(), retired, ticks);
+                if (scheduled != null) {
+                    return new TaskHandle(scheduled::cancel, scheduled::isCancelled);
+                }
+            }
+            if (ticks <= 0) {
+                return run(() -> {
+                    if (ent.isValid()) {
+                        task.run();
+                    } else if (retired != null) {
+                        retired.run();
+                    }
+                });
+            }
+            return runLater(ticks, () -> {
+                if (ent.isValid()) {
+                    task.run();
+                } else if (retired != null) {
+                    retired.run();
+                }
+            });
+        }
+        if (retired != null) {
+            retired.run();
+        }
         return run(task);
+    }
+
+    @Contract("_, _, _, _, _ -> new")
+    @Override
+    public @NonNull TaskHandle runRepeatingFor(Object entity, Duration initialDelay, Duration period, Runnable task, Runnable retired) {
+        return runRepeatingFor(entity, toTicks(initialDelay), toTicks(period), task, retired);
+    }
+
+    @Contract("_, _, _, _, _ -> new")
+    @Override
+    public @NonNull TaskHandle runRepeatingFor(Object entity, long initialTicks, long periodTicks, Runnable task, Runnable retired) {
+        if (entity instanceof Entity ent) {
+            if (FOLIA) {
+                var scheduled = ent.getScheduler().runAtFixedRate(plugin, t -> task.run(), retired, initialTicks, periodTicks);
+                if (scheduled != null) {
+                    return new TaskHandle(scheduled::cancel, scheduled::isCancelled);
+                }
+            }
+            return runRepeating(initialTicks, periodTicks, () -> {
+                if (ent.isValid()) {
+                    task.run();
+                } else if (retired != null) {
+                    retired.run();
+                }
+            });
+        }
+        if (retired != null) {
+            retired.run();
+        }
+        return runRepeating(initialTicks, periodTicks, task);
     }
 
     private long toTicks(@NonNull Duration duration) {

@@ -1,6 +1,8 @@
 package dev.oum.oumlib.util;
 
+import dev.oum.oumlib.util.Permission.Default;
 import org.bukkit.Bukkit;
+import org.bukkit.permissions.Permission;
 import org.bukkit.permissions.PermissionDefault;
 import org.bukkit.plugin.PluginManager;
 import org.jspecify.annotations.NonNull;
@@ -10,7 +12,7 @@ public final class PaperPermissionHelper {
     private PaperPermissionHelper() {
     }
 
-    public static void register(String name, String description, Permission.@NonNull Default defaultValue) {
+    public static void register(String name, String description, @NonNull Default defaultValue) {
         PermissionDefault defaultVal = switch (defaultValue) {
             case TRUE -> PermissionDefault.TRUE;
             case FALSE -> PermissionDefault.FALSE;
@@ -18,7 +20,7 @@ public final class PaperPermissionHelper {
             case NOT_OP -> PermissionDefault.NOT_OP;
         };
 
-        org.bukkit.permissions.Permission bukkitPerm = new org.bukkit.permissions.Permission(
+        Permission bukkitPerm = new Permission(
                 name,
                 description,
                 defaultVal
